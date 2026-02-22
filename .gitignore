@@ -1,0 +1,5 @@
+/target
+.claude/
+gui/node_modules/
+gui/dist/
+docs/plans/

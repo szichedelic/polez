@@ -1,0 +1,76 @@
+[package]
+name = "polez"
+version = "2.0.0"
+edition = "2021"
+description = "Polez - Audio forensics and sanitization engine"
+license = "MIT"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive", "color", "wrap_help"] }
+
+# Audio metadata
+lofty = "0.21"
+
+# Audio I/O
+hound = "3.5"
+symphonia = { version = "0.5", features = ["mp3", "wav", "pcm", "isomp4", "aac"] }
+mp3lame-encoder = "0.2"
+
+# DSP / FFT
+rustfft = "6"
+realfft = "3"
+ndarray = "0.16"
+
+# Resampling
+rubato = "0.15"
+
+# Numeric
+num-complex = "0.4"
+rand = "0.8"
+rand_distr = "0.4"
+
+# Parallelism
+rayon = "1.10"
+
+# Config
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+dirs = "5"
+
+# UI
+indicatif = "0.17"
+console = "0.15"
+colored = "2"
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+# Hashing
+sha2 = "0.10"
+
+# Misc
+walkdir = "2"
+
+# GUI (optional)
+axum = { version = "0.8", optional = true }
+tokio = { version = "1", features = ["full"], optional = true }
+tower-http = { version = "0.6", features = ["cors", "fs"], optional = true }
+rust-embed = { version = "8", optional = true }
+serde_json = { version = "1", optional = true }
+open = { version = "5", optional = true }
+mime_guess = { version = "2", optional = true }
+
+[features]
+default = ["gui"]
+gui = ["dep:axum", "dep:tokio", "dep:tower-http", "dep:rust-embed", "dep:serde_json", "dep:open", "dep:mime_guess"]
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+
+[[bin]]
+name = "polez"
+path = "src/main.rs"
