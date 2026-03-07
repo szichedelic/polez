@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::detection::{
     metadata_scan::MetadataScanResult, polez::PolezDetectionResult, statistical::StatisticalResult,
@@ -52,4 +52,21 @@ pub struct PlaneSummary {
     pub bit: u8,
     pub ones_ratio: f64,
     pub bias: f64,
+}
+
+#[derive(Deserialize)]
+pub struct CleanRequest {
+    pub mode: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct CleanResponse {
+    pub success: bool,
+    pub metadata_removed: usize,
+    pub patterns_found: usize,
+    pub patterns_suppressed: usize,
+    pub quality_loss: f64,
+    pub processing_time: f64,
+    pub before: AllAnalysisResult,
+    pub after: AllAnalysisResult,
 }

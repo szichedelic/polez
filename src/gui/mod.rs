@@ -15,6 +15,9 @@ pub struct AppState {
     pub buffer: Option<AudioBuffer>,
     pub file_path: Option<String>,
     pub format: Option<String>,
+    pub cleaned_buffer: Option<AudioBuffer>,
+    pub cleaned_file_path: Option<String>,
+    pub cleaned_format: Option<String>,
 }
 
 impl AppState {
@@ -23,6 +26,9 @@ impl AppState {
             buffer: None,
             file_path: None,
             format: None,
+            cleaned_buffer: None,
+            cleaned_file_path: None,
+            cleaned_format: None,
         }
     }
 }
