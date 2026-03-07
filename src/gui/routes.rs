@@ -1,3 +1,4 @@
+use axum::extract::DefaultBodyLimit;
 use axum::{
     extract::{Multipart, Query, State},
     http::{header, StatusCode},
@@ -10,13 +11,12 @@ use rustfft::FftPlanner;
 use serde::Deserialize;
 use std::io::Write;
 use std::path::Path;
-use axum::extract::DefaultBodyLimit;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::config::{defaults::default_config, AdvancedFlags};
 use crate::detection::{MetadataScanner, PolezDetector, StatisticalAnalyzer, WatermarkDetector};
-use crate::sanitization::SanitizationPipeline;
 use crate::sanitization::pipeline::SanitizationMode;
+use crate::sanitization::SanitizationPipeline;
 
 use super::types::{
     AllAnalysisResult, BitPlaneData, CleanRequest, CleanResponse, FileInfo, PlaneSummary,
@@ -127,75 +127,70 @@ async fn upload_file(
     State(state): State<SharedState>,
     mut multipart: Multipart,
 ) -> Result<Json<FileInfo>, (StatusCode, String)> {
-    while let Some(field) = multipart
+    let field = multipart
         .next_field()
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("Multipart error: {e}")))?
-    {
-        let file_name = field
-            .file_name()
-            .unwrap_or("upload.wav")
-            .to_string();
+        .ok_or((StatusCode::BAD_REQUEST, "No file field found".to_string()))?;
 
-        let ext = Path::new(&file_name)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("wav");
+    let file_name = field.file_name().unwrap_or("upload.wav").to_string();
 
-        let mut tmp = tempfile::Builder::new()
-            .suffix(&format!(".{ext}"))
-            .tempfile()
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Temp file error: {e}"),
-                )
-            })?;
+    let ext = Path::new(&file_name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("wav");
 
-        let bytes = field
-            .bytes()
-            .await
-            .map_err(|e| (StatusCode::BAD_REQUEST, format!("Read error: {e}")))?;
-
-        tmp.write_all(&bytes).map_err(|e| {
+    let mut tmp = tempfile::Builder::new()
+        .suffix(&format!(".{ext}"))
+        .tempfile()
+        .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Write error: {e}"),
+                format!("Temp file error: {e}"),
             )
         })?;
 
-        let tmp_path = tmp.into_temp_path();
-        let path_str = tmp_path.to_string_lossy().to_string();
+    let bytes = field
+        .bytes()
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Read error: {e}")))?;
 
-        // Leak the temp path so the file persists for the session
-        let leaked: &'static std::path::Path = Box::leak(tmp_path.to_path_buf().into_boxed_path());
-        std::mem::forget(tmp_path);
-        let _ = leaked;
+    tmp.write_all(&bytes).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Write error: {e}"),
+        )
+    })?;
 
-        let (buffer, format) = crate::audio::load_audio(Path::new(&path_str)).map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Load error: {e}"),
-            )
-        })?;
+    let tmp_path = tmp.into_temp_path();
+    let path_str = tmp_path.to_string_lossy().to_string();
 
-        let info = FileInfo {
-            file_path: file_name,
-            format: format.to_string(),
-            duration_secs: buffer.duration_secs(),
-            sample_rate: buffer.sample_rate,
-            channels: buffer.num_channels(),
-        };
+    // Leak the temp path so the file persists for the session
+    let leaked: &'static std::path::Path = Box::leak(tmp_path.to_path_buf().into_boxed_path());
+    std::mem::forget(tmp_path);
+    let _ = leaked;
 
-        let mut app_state = state.write().await;
-        app_state.file_path = Some(path_str);
-        app_state.format = Some(info.format.clone());
-        app_state.buffer = Some(buffer);
+    let (buffer, format) = crate::audio::load_audio(Path::new(&path_str)).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Load error: {e}"),
+        )
+    })?;
 
-        return Ok(Json(info));
-    }
+    let info = FileInfo {
+        file_path: file_name,
+        format: format.to_string(),
+        duration_secs: buffer.duration_secs(),
+        sample_rate: buffer.sample_rate,
+        channels: buffer.num_channels(),
+    };
 
-    Err((StatusCode::BAD_REQUEST, "No file field found".to_string()))
+    let mut app_state = state.write().await;
+    app_state.file_path = Some(path_str);
+    app_state.format = Some(info.format.clone());
+    app_state.buffer = Some(buffer);
+
+    Ok(Json(info))
 }
 
 // --- Analysis endpoints ---
@@ -525,12 +520,7 @@ async fn clean_file(
         "standard" => SanitizationMode::Standard,
         "preserving" => SanitizationMode::Preserving,
         "aggressive" => SanitizationMode::Aggressive,
-        other => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!("Unknown mode: {other}"),
-            ))
-        }
+        other => return Err((StatusCode::BAD_REQUEST, format!("Unknown mode: {other}"))),
     };
 
     // Read source info from state
@@ -594,13 +584,12 @@ async fn clean_file(
     })?;
 
     // Load cleaned audio
-    let (cleaned_buffer, cleaned_fmt) =
-        crate::audio::load_audio(&output_path).map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Load cleaned error: {e}"),
-            )
-        })?;
+    let (cleaned_buffer, cleaned_fmt) = crate::audio::load_audio(&output_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Load cleaned error: {e}"),
+        )
+    })?;
 
     // Run detection on original (before)
     let before = {
@@ -668,10 +657,10 @@ async fn serve_cleaned_audio(
     State(state): State<SharedState>,
 ) -> Result<Response, (StatusCode, String)> {
     let state = state.read().await;
-    let file_path = state
-        .cleaned_file_path
-        .as_ref()
-        .ok_or((StatusCode::BAD_REQUEST, "No cleaned file available".to_string()))?;
+    let file_path = state.cleaned_file_path.as_ref().ok_or((
+        StatusCode::BAD_REQUEST,
+        "No cleaned file available".to_string(),
+    ))?;
 
     let bytes = std::fs::read(file_path).map_err(|e| {
         (
@@ -696,10 +685,10 @@ async fn get_cleaned_waveform(
     Query(query): Query<WaveformQuery>,
 ) -> Result<Json<WaveformData>, (StatusCode, String)> {
     let state = state.read().await;
-    let buffer = state
-        .cleaned_buffer
-        .as_ref()
-        .ok_or((StatusCode::BAD_REQUEST, "No cleaned file available".to_string()))?;
+    let buffer = state.cleaned_buffer.as_ref().ok_or((
+        StatusCode::BAD_REQUEST,
+        "No cleaned file available".to_string(),
+    ))?;
 
     let samples = buffer.to_mono_samples();
     let sr = buffer.sample_rate as f64;
@@ -752,10 +741,10 @@ async fn save_cleaned_file(
     State(state): State<SharedState>,
 ) -> Result<Response, (StatusCode, String)> {
     let state = state.read().await;
-    let file_path = state
-        .cleaned_file_path
-        .as_ref()
-        .ok_or((StatusCode::BAD_REQUEST, "No cleaned file available".to_string()))?;
+    let file_path = state.cleaned_file_path.as_ref().ok_or((
+        StatusCode::BAD_REQUEST,
+        "No cleaned file available".to_string(),
+    ))?;
 
     let bytes = std::fs::read(file_path).map_err(|e| {
         (
