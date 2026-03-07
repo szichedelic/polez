@@ -1,8 +1,19 @@
-# Polez
+```
+      ██████╗  ██████╗ ██╗     ███████╗███████╗
+      ██╔══██╗██╔═══██╗██║     ██╔════╝╚══███╔╝
+      ██████╔╝██║   ██║██║     █████╗    ███╔╝
+      ██╔═══╝ ██║   ██║██║     ██╔══╝   ███╔╝
+      ██║     ╚██████╔╝███████╗███████╗███████╗
+      ╚═╝      ╚═════╝ ╚══════╝╚══════╝╚══════╝
 
-Audio forensics and sanitization engine. Analyzes, detects, and removes watermarks, metadata, and statistical fingerprints from audio files.
+    ─╴╶─╴╶─▁▂▃▄▅▆▇█▇▆▅▄▃▂▁─╴╶─▁▂▃▅▇█▇▅▃▂▁─╴╶─╴╶─
 
-> *"The silent hand that scrubs the score"*
+    Audio Forensics & Sanitization Engine    v2.0
+
+    ─╴╶─╴╶─▁▂▃▅▇█▇▅▃▂▁─╴╶─▁▂▃▄▅▆▇█▇▆▅▄▃▂▁─╴╶─╴╶─
+```
+
+> Audio forensics and sanitization engine. Analyzes, detects, and removes watermarks, metadata, and statistical fingerprints from audio files.
 
 ## Install
 
@@ -16,14 +27,14 @@ Binary outputs to `target/release/polez` (or `polez.exe` on Windows).
 
 ## Commands
 
-### obliterate
+### clean
 
 Sanitize a single audio file.
 
 ```bash
-polez obliterate input.mp3 -o clean.mp3
-polez obliterate input.wav --paranoid --verify
-polez obliterate input.mp3 --backup --format wav
+polez clean input.mp3 -o clean.mp3
+polez clean input.wav --paranoid --verify
+polez clean input.mp3 --backup --format wav
 ```
 
 | Flag | Description |
@@ -34,15 +45,15 @@ polez obliterate input.mp3 --backup --format wav
 | `--backup` | Create backup of original |
 | `-f, --format` | Output format: `preserve`, `mp3`, `wav` |
 
-### massacre
+### sweep
 
 Batch process a directory of audio files.
 
 ```bash
-polez massacre ./music/
-polez massacre ./music/ -d ./clean/ --paranoid --workers 8
-polez massacre ./music/ -r --extension mp3 wav flac
-polez massacre ./music/ --dry-run
+polez sweep ./music/
+polez sweep ./music/ -d ./clean/ --paranoid --workers 8
+polez sweep ./music/ -r --extension mp3 wav flac
+polez sweep ./music/ --dry-run
 ```
 
 | Flag | Description |
@@ -55,18 +66,53 @@ polez massacre ./music/ --dry-run
 | `--dry-run` | List files without processing |
 | `--backup` | Create backups |
 
-### analyze
+### detect
 
 Detect watermarks and fingerprints without modifying the file.
 
 ```bash
-polez analyze input.mp3
-polez analyze input.wav --deep
+polez detect input.mp3
+polez detect input.wav --deep
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--deep` | Enable statistical analysis with AI probability scoring |
+
+### inspect
+
+Visualize high-frequency spectrogram to reveal watermarks.
+
+```bash
+polez inspect input.mp3 --freq-min 15000 --freq-max 24000
+polez inspect input.wav --start 10 --duration 5
+```
+
+### bits
+
+View raw bit patterns to find embedded watermark data.
+
+```bash
+polez bits input.mp3 --bit 0 --count 10000
+polez bits input.wav --search
+```
+
+### benchmark
+
+Batch scan a directory and output CSV results for dataset analysis.
+
+```bash
+polez benchmark ./dataset/ -o results.csv -r
+```
+
+### gui
+
+Launch web-based forensics GUI (requires `gui` feature).
+
+```bash
+cargo build --release --features gui
+polez gui --port 3000
+```
 
 ### config
 
@@ -85,7 +131,7 @@ Built-in presets: `stealth`, `stealth-plus`, `fast`, `quality`, `research`.
 
 ## Advanced Stealth Flags
 
-Fine-grained control over individual sanitization operations (used with `obliterate`):
+Fine-grained control over individual sanitization operations (used with `clean`):
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -135,4 +181,4 @@ The `--paranoid` flag forces Aggressive mode with 2 additional passes.
 
 ## License
 
-Proprietary. All rights reserved.
+MIT
