@@ -5,6 +5,7 @@ import { Waveform } from './components/Waveform';
 import { Spectrogram } from './components/Spectrogram';
 import { DetectionPanel } from './components/DetectionPanel';
 import { BitPlaneViewer } from './components/BitPlaneViewer';
+import { CleanPanel } from './components/CleanPanel';
 
 function App() {
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
@@ -21,6 +22,8 @@ function App() {
           <DetectionPanel fileLoaded={!!fileInfo} />
           <BitPlaneViewer fileLoaded={!!fileInfo} />
         </div>
+
+        <CleanPanel fileLoaded={!!fileInfo} />
       </div>
     </div>
   );

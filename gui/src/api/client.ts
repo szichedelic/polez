@@ -36,6 +36,17 @@ export interface BitPlaneData {
   planes: PlaneSummary[];
 }
 
+export async function uploadFile(file: File): Promise<FileInfo> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${BASE}/api/upload`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function loadFile(path: string): Promise<FileInfo> {
   const res = await fetch(`${BASE}/api/load`, {
     method: 'POST',
@@ -111,4 +122,50 @@ export async function analyzeMetadata(): Promise<any> {
 
 export function getAudioUrl(): string {
   return `${BASE}/api/audio`;
+}
+
+export interface CleanResponse {
+  success: boolean;
+  metadata_removed: number;
+  patterns_found: number;
+  patterns_suppressed: number;
+  quality_loss: number;
+  processing_time: number;
+  before: any;
+  after: any;
+}
+
+export async function cleanFile(mode?: string): Promise<CleanResponse> {
+  const res = await fetch(`${BASE}/api/clean`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: mode || 'standard' }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getCleanedWaveform(width = 1200, start?: number, end?: number): Promise<WaveformData> {
+  const params = new URLSearchParams({ width: String(width) });
+  if (start !== undefined) params.set('start', String(start));
+  if (end !== undefined) params.set('end', String(end));
+  const res = await fetch(`${BASE}/api/waveform/cleaned?${params}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export function getCleanedAudioUrl(): string {
+  return `${BASE}/api/audio/cleaned`;
+}
+
+export async function saveCleanedFile(): Promise<void> {
+  const res = await fetch(`${BASE}/api/save`, { method: 'POST' });
+  if (!res.ok) throw new Error(await res.text());
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cleaned_output.wav';
+  a.click();
+  URL.revokeObjectURL(url);
 }

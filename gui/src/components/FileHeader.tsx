@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { FileInfo } from '../api/client';
-import { loadFile } from '../api/client';
+import { uploadFile } from '../api/client';
 
 interface Props {
   fileInfo: FileInfo | null;
@@ -8,23 +8,44 @@ interface Props {
 }
 
 export function FileHeader({ fileInfo, onFileLoaded }: Props) {
-  const [path, setPath] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleLoad = async () => {
-    if (!path.trim()) return;
+  const handleFile = useCallback(async (file: File) => {
     setLoading(true);
     setError(null);
     try {
-      const info = await loadFile(path.trim());
+      const info = await uploadFile(file);
       onFileLoaded(info);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  };
+  }, [onFileLoaded]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }, [handleFile]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOver(false);
+  }, []);
+
+  const handlePickerChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+  }, [handleFile]);
 
   const formatDuration = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -32,36 +53,71 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  return (
-    <div className="flex items-center gap-4 bg-zinc-900 border-b border-zinc-700 px-4 py-3">
-      <span className="text-purple-400 font-bold text-lg tracking-wider">POLEZ</span>
-      <div className="flex items-center gap-2 flex-1">
-        <input
-          type="text"
-          value={path}
-          onChange={(e) => setPath(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleLoad()}
-          placeholder="Enter file path..."
-          className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-3 py-1.5 flex-1 text-sm focus:outline-none focus:border-purple-500"
-        />
-        <button
-          onClick={handleLoad}
-          disabled={loading}
-          className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-4 py-1.5 rounded text-sm font-medium"
-        >
-          {loading ? 'Loading...' : 'Open File'}
-        </button>
-      </div>
-      {error && <span className="text-red-400 text-sm">{error}</span>}
-      {fileInfo && (
-        <div className="flex items-center gap-4 text-zinc-400 text-sm">
-          <span className="text-zinc-200">{fileInfo.file_path.split('/').pop()}</span>
+  if (fileInfo && !loading) {
+    return (
+      <div className="flex items-center gap-4 bg-zinc-900 border-b border-zinc-700 px-4 py-3">
+        <span className="text-purple-400 font-bold text-lg tracking-wider">POLEZ</span>
+        <div className="flex items-center gap-4 text-zinc-400 text-sm flex-1">
+          <span className="text-zinc-200 font-medium">{fileInfo.file_path.split('/').pop()}</span>
           <span>{fileInfo.format.toUpperCase()}</span>
           <span>{fileInfo.sample_rate / 1000}kHz</span>
           <span>{fileInfo.channels}ch</span>
           <span>{formatDuration(fileInfo.duration_secs)}</span>
         </div>
+        <button
+          onClick={() => inputRef.current?.click()}
+          className="text-zinc-400 hover:text-zinc-200 text-sm"
+        >
+          Change file
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="audio/*"
+          onChange={handlePickerChange}
+          className="hidden"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-lg mx-4 my-4 py-12 transition-colors ${
+        dragOver
+          ? 'border-purple-400 bg-purple-500/10'
+          : 'border-zinc-600 bg-zinc-900 hover:border-zinc-500'
+      }`}
+    >
+      <div className="text-purple-400 font-bold text-2xl tracking-widest mb-2">POLEZ</div>
+      <div className="text-zinc-500 text-xs mb-4">Audio Forensics & Sanitization Engine</div>
+      {loading ? (
+        <div className="text-zinc-400 text-sm animate-pulse">Loading audio...</div>
+      ) : (
+        <>
+          <div className="text-zinc-400 text-sm">
+            Drag & drop an audio file here
+          </div>
+          <div className="text-zinc-500 text-xs">or</div>
+          <button
+            onClick={() => inputRef.current?.click()}
+            className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-1.5 rounded text-sm font-medium"
+          >
+            Choose File
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="audio/*"
+            onChange={handlePickerChange}
+            className="hidden"
+          />
+        </>
       )}
+      {error && <span className="text-red-400 text-sm">{error}</span>}
     </div>
   );
 }
