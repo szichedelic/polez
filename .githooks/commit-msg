@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Enforce conventional commit format and strip co-authorship trailers
+
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Strip any Co-Authored-By lines
+sed -i.bak '/^Co-Authored-By:/d' "$COMMIT_MSG_FILE"
+rm -f "${COMMIT_MSG_FILE}.bak"
+
+# Re-read after stripping
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Get just the first line (subject)
+SUBJECT=$(head -1 "$COMMIT_MSG_FILE")
+
+# Enforce single-line commit message (no body required, but subject must be conventional)
+PATTERN="^(feat|fix|chore|docs|style|refactor|perf|test|ci|build|revert)(\(.+\))?: .{1,100}$"
+
+if ! echo "$SUBJECT" | grep -qE "$PATTERN"; then
+  echo "ERROR: Commit message must follow conventional commit format:"
+  echo "  <type>(<scope>): <description>"
+  echo ""
+  echo "  Types: feat, fix, chore, docs, style, refactor, perf, test, ci, build, revert"
+  echo "  Example: feat(gui): add spectrogram for cleaned audio"
+  echo ""
+  echo "  Got: $SUBJECT"
+  exit 1
+fi
