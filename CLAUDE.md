@@ -91,3 +91,12 @@ Polez is an audio forensics and sanitization CLI tool written in Rust. It detect
 4. Optional paranoid multi-pass (2 additional passes)
 5. RMS restoration and soft clipping
 6. Save output (hound/mp3lame encode)
+
+## Git Commit Rules
+
+- **Format:** Conventional commits only — `<type>(<scope>): <description>`
+- **Types:** feat, fix, chore, docs, style, refactor, perf, test, ci, build, revert
+- **Single line:** Commit messages must be a single subject line (no body)
+- **No co-authorship:** Never add `Co-Authored-By` trailers to commits
+- **Atomic commits:** Keep commits small and logically grouped — fewer files per commit, more commits
+- **Hook:** `.githooks/commit-msg` enforces these rules automatically. Git is configured to use `.githooks/` via `core.hooksPath`
