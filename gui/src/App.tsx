@@ -8,6 +8,7 @@ import { BitPlaneViewer } from './components/BitPlaneViewer';
 import { CleanPanel } from './components/CleanPanel';
 import { AudioPlayer } from './components/AudioPlayer';
 import { ComparisonTimeline } from './components/ComparisonTimeline';
+import { MetadataViewer } from './components/MetadataViewer';
 
 function App() {
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
@@ -31,6 +32,8 @@ function App() {
           <DetectionPanel fileLoaded={!!fileInfo} />
           <BitPlaneViewer fileLoaded={!!fileInfo} />
         </div>
+
+        <MetadataViewer fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
 
         <CleanPanel fileLoaded={!!fileInfo} onCleaned={() => setHasCleaned(true)} />
         <ComparisonTimeline fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
