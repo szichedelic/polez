@@ -849,22 +849,29 @@ fn detect_codec_artifacts(channel: &[f32], sr: u32) -> MethodResult {
     }
 
     // Test 3: Spectral band replication detection (common in AAC HE / MP3 SBR)
-    // SBR copies lower frequency content to fill upper bands, creating correlation
+    // SBR copies lower frequency content to fill upper bands, creating correlation.
+    // Typical SBR crossover: ~5-6 kHz. Source band: just below crossover, replicated band: just above.
     if !spectrogram.is_empty() {
         let n_freqs = spectrogram[0].len();
-        let mid_bin = n_freqs / 2;
-        let quarter_bin = n_freqs / 4;
+        let freq_per_bin = sr as f64 / (2.0 * n_freqs as f64);
 
-        if mid_bin > quarter_bin && quarter_bin > 0 {
+        // Source band: 2-5 kHz, Replicated band: 5-10 kHz (typical SBR crossover ~5 kHz)
+        let src_lo = (2000.0 / freq_per_bin) as usize;
+        let src_hi = (5000.0 / freq_per_bin) as usize;
+        let rep_lo = (5000.0 / freq_per_bin) as usize;
+        let rep_hi = (10000.0 / freq_per_bin) as usize;
+
+        let band_len = src_hi.saturating_sub(src_lo);
+        if band_len > 0 && rep_hi <= n_freqs && src_hi <= n_freqs {
             let mut correlation_sum = 0.0f64;
             let mut count = 0usize;
 
             for frame in spectrogram.iter().take(50) {
-                let low_band: Vec<f64> = frame[quarter_bin..mid_bin]
+                let low_band: Vec<f64> = frame[src_lo..src_hi]
                     .iter()
                     .map(|c| c.norm() as f64)
                     .collect();
-                let high_band: Vec<f64> = frame[mid_bin..mid_bin + (mid_bin - quarter_bin)]
+                let high_band: Vec<f64> = frame[rep_lo..rep_hi]
                     .iter()
                     .take(low_band.len())
                     .map(|c| c.norm() as f64)
