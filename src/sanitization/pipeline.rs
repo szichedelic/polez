@@ -70,37 +70,39 @@ impl SanitizationPipeline {
         }
     }
 
+    /// Threshold in samples above which chunked processing is used.
+    /// ~60 seconds at 44.1kHz stereo ≈ 5.3M samples.
+    const CHUNK_THRESHOLD: usize = 5_000_000;
+
+    /// Chunk size in samples for streaming mode (~30 seconds at 44.1kHz).
+    const CHUNK_SIZE: usize = 1_323_000;
+
+    /// Overlap between chunks in samples (~1 second at 44.1kHz) for crossfade.
+    const OVERLAP: usize = 44_100;
+
     /// Run the sanitization pipeline.
     pub fn run(&self, input: &Path, output: &Path) -> Result<SanitizationResult> {
         let start = Instant::now();
 
         let metadata_removed = MetadataCleaner::strip_to(input, output)?;
 
-        let (mut buffer, source_format) = audio::load_audio(output)?;
+        let (buffer, source_format) = audio::load_audio(output)?;
         let original_rms = buffer.rms();
 
-        let (patterns_found, patterns_suppressed) = match self.mode {
-            SanitizationMode::Fast => (0, 0),
-            SanitizationMode::Standard => self.run_standard(&mut buffer)?,
-            SanitizationMode::Preserving => self.run_preserving(&mut buffer)?,
-            SanitizationMode::Aggressive => self.run_aggressive(&mut buffer)?,
+        let (mut buffer, patterns_found, patterns_suppressed) = if buffer.num_samples()
+            > Self::CHUNK_THRESHOLD
+            && self.mode != SanitizationMode::Fast
+        {
+            tracing::info!(
+                samples = buffer.num_samples(),
+                "Large file detected, using chunked processing"
+            );
+            self.process_chunked(buffer)?
+        } else {
+            let mut buf = buffer;
+            let (f, s) = self.process_buffer(&mut buf)?;
+            (buf, f, s)
         };
-
-        // Paranoid multi-pass runs spectral cleaning extra times; fingerprint/stealth run once
-        // to avoid compounding artifacts that would degrade perceptual quality.
-        if self.paranoid && self.mode != SanitizationMode::Fast {
-            for _pass in 0..2 {
-                SpectralCleaner::clean(&mut buffer, self.paranoid, &self.flags)?;
-            }
-        }
-
-        // Adaptive notch runs last — STFT operations in earlier passes would undo its work.
-        let (mut patterns_found, mut patterns_suppressed) = (patterns_found, patterns_suppressed);
-        if self.flags.adaptive_notch && self.mode != SanitizationMode::Fast {
-            let notched = SpectralCleaner::adaptive_notch_pass(&mut buffer, self.paranoid)?;
-            patterns_found += notched;
-            patterns_suppressed += notched;
-        }
 
         let processed_rms = buffer.rms();
         if processed_rms > 1e-10 && original_rms > 1e-10 {
@@ -135,6 +137,55 @@ impl SanitizationPipeline {
             quality_loss,
             processing_time: elapsed,
         })
+    }
+
+    /// Process the entire buffer in one pass (original behavior).
+    fn process_buffer(&self, buffer: &mut AudioBuffer) -> Result<(usize, usize)> {
+        let (mut patterns_found, mut patterns_suppressed) = match self.mode {
+            SanitizationMode::Fast => (0, 0),
+            SanitizationMode::Standard => self.run_standard(buffer)?,
+            SanitizationMode::Preserving => self.run_preserving(buffer)?,
+            SanitizationMode::Aggressive => self.run_aggressive(buffer)?,
+        };
+
+        if self.paranoid && self.mode != SanitizationMode::Fast {
+            for _pass in 0..2 {
+                SpectralCleaner::clean(buffer, self.paranoid, &self.flags)?;
+            }
+        }
+
+        if self.flags.adaptive_notch && self.mode != SanitizationMode::Fast {
+            let notched = SpectralCleaner::adaptive_notch_pass(buffer, self.paranoid)?;
+            patterns_found += notched;
+            patterns_suppressed += notched;
+        }
+
+        Ok((patterns_found, patterns_suppressed))
+    }
+
+    /// Process a large buffer in overlapping chunks to limit memory usage.
+    fn process_chunked(&self, buffer: AudioBuffer) -> Result<(AudioBuffer, usize, usize)> {
+        let chunks = buffer.split_chunks(Self::CHUNK_SIZE, Self::OVERLAP);
+        let num_chunks = chunks.len();
+        tracing::info!(chunks = num_chunks, "Processing in chunks");
+
+        // Drop original buffer to free memory before processing chunks
+        drop(buffer);
+
+        let mut total_found = 0usize;
+        let mut total_suppressed = 0usize;
+        let mut processed_chunks = Vec::with_capacity(num_chunks);
+
+        for (i, mut chunk) in chunks.into_iter().enumerate() {
+            tracing::debug!(chunk = i + 1, total = num_chunks, "Processing chunk");
+            let (found, suppressed) = self.process_buffer(&mut chunk)?;
+            total_found += found;
+            total_suppressed += suppressed;
+            processed_chunks.push(chunk);
+        }
+
+        let joined = AudioBuffer::join_chunks(&processed_chunks, Self::OVERLAP);
+        Ok((joined, total_found, total_suppressed))
     }
 
     fn run_standard(&self, buffer: &mut AudioBuffer) -> Result<(usize, usize)> {

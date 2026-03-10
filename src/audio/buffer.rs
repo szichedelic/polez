@@ -153,4 +153,82 @@ impl AudioBuffer {
     pub fn hard_clip(&mut self) {
         self.samples.mapv_inplace(|s| s.clamp(-1.0, 1.0));
     }
+
+    /// Split buffer into overlapping chunks for chunked processing.
+    /// Returns chunks and the overlap size in samples.
+    pub fn split_chunks(&self, chunk_samples: usize, overlap_samples: usize) -> Vec<AudioBuffer> {
+        let total = self.num_samples();
+        let step = chunk_samples.saturating_sub(overlap_samples).max(1);
+        let mut chunks = Vec::new();
+        let mut start = 0;
+
+        while start < total {
+            let end = (start + chunk_samples).min(total);
+            let slice = self.samples.slice(ndarray::s![start..end, ..]);
+            let chunk_arr = slice.to_owned();
+            chunks.push(AudioBuffer::new(chunk_arr, self.sample_rate));
+            if end >= total {
+                break;
+            }
+            start += step;
+        }
+
+        chunks
+    }
+
+    /// Join overlapping chunks with crossfade (overlap-add).
+    pub fn join_chunks(chunks: &[AudioBuffer], overlap_samples: usize) -> AudioBuffer {
+        if chunks.is_empty() {
+            return AudioBuffer::from_mono(vec![], 44100);
+        }
+        if chunks.len() == 1 {
+            return chunks[0].clone();
+        }
+
+        let sample_rate = chunks[0].sample_rate;
+        let channels = chunks[0].num_channels();
+
+        // Calculate total output length
+        let first_len = chunks[0].num_samples();
+        let total: usize = first_len
+            + chunks[1..]
+                .iter()
+                .map(|c| c.num_samples().saturating_sub(overlap_samples))
+                .sum::<usize>();
+
+        let mut output = Array2::<f32>::zeros((total, channels));
+        let mut pos = 0;
+
+        for (i, chunk) in chunks.iter().enumerate() {
+            let n = chunk.num_samples();
+            if i == 0 {
+                output
+                    .slice_mut(ndarray::s![0..n, ..])
+                    .assign(&chunk.samples);
+                pos = n;
+            } else {
+                let overlap = overlap_samples.min(n).min(pos);
+                // Crossfade the overlap region
+                for j in 0..overlap {
+                    let fade_out = (overlap - j) as f32 / overlap as f32;
+                    let fade_in = j as f32 / overlap as f32;
+                    let out_idx = pos - overlap + j;
+                    for ch in 0..channels {
+                        output[[out_idx, ch]] =
+                            output[[out_idx, ch]] * fade_out + chunk.samples[[j, ch]] * fade_in;
+                    }
+                }
+                // Copy the non-overlapping part
+                let remaining = n.saturating_sub(overlap);
+                if remaining > 0 {
+                    output
+                        .slice_mut(ndarray::s![pos..pos + remaining, ..])
+                        .assign(&chunk.samples.slice(ndarray::s![overlap..n, ..]));
+                    pos += remaining;
+                }
+            }
+        }
+
+        AudioBuffer::new(output, sample_rate)
+    }
 }
