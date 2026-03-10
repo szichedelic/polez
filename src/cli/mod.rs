@@ -38,6 +38,7 @@ Examples:
   polez clean track.mp3 -o clean.mp3 --verify   Clean and verify effectiveness
   polez clean track.wav --paranoid --backup      Maximum destruction with backup
   polez clean track.wav --dry-run --report r.json  Analyze without cleaning
+  polez clean track.mp3 -f wav                    Convert output to WAV format
   polez --json clean track.wav                   Machine-readable JSON output")]
     Clean {
         /// Input audio file path
@@ -88,7 +89,8 @@ Examples:
   polez sweep ./music                           Clean all audio files in directory
   polez sweep ./music -d ./clean -w 8           Custom output dir, 8 workers
   polez sweep ./music -r --paranoid --backup    Recursive paranoid mode with backups
-  polez sweep ./music -e mp3 -e wav --dry-run   Preview which files would be processed")]
+  polez sweep ./music -e mp3 -e wav --dry-run   Preview which files would be processed
+  polez sweep ./music -f wav                    Convert all output to WAV format")]
     Sweep {
         /// Directory containing audio files
         directory: PathBuf,
@@ -120,6 +122,10 @@ Examples:
         /// List files without processing
         #[arg(long)]
         dry_run: bool,
+
+        /// Output audio format (overrides input format)
+        #[arg(short, long, value_enum, default_value = "preserve")]
+        format: FormatChoice,
 
         #[command(flatten)]
         fp_flags: FingerprintFlagsCli,
@@ -311,6 +317,8 @@ pub enum FormatChoice {
     Preserve,
     Mp3,
     Wav,
+    Flac,
+    Aac,
 }
 
 #[derive(Clone, Copy, ValueEnum)]

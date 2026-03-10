@@ -250,6 +250,7 @@ fn run_command(
             backup,
             recursive,
             dry_run,
+            format,
             fp_flags,
         } => cmd_sweep(
             &directory,
@@ -260,6 +261,7 @@ fn run_command(
             backup,
             recursive,
             dry_run,
+            format,
             fp_flags.into(),
             console,
             banner,
@@ -363,11 +365,7 @@ fn cmd_clean(
         ),
     };
 
-    let out_format = match format {
-        FormatChoice::Preserve => None,
-        FormatChoice::Mp3 => Some(audio::AudioFormat::Mp3),
-        FormatChoice::Wav => Some(audio::AudioFormat::Wav),
-    };
+    let out_format = resolve_output_format(format)?;
 
     if backup {
         let backup_path = input_file.with_extension(format!(
@@ -595,6 +593,7 @@ fn cmd_clean(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn cmd_sweep(
     directory: &Path,
     output_dir: Option<&Path>,
@@ -604,10 +603,12 @@ fn cmd_sweep(
     backup: bool,
     recursive: bool,
     dry_run: bool,
+    format: FormatChoice,
     fp_config: config::FingerprintRemovalConfig,
     console: &ConsoleManager,
     banner: &BannerManager,
 ) -> error::Result<()> {
+    let out_format = resolve_output_format(format)?;
     let start = Instant::now();
 
     console.success(&format!(
@@ -708,7 +709,7 @@ fn cmd_sweep(
                     paranoid,
                     flags.clone(),
                     fp_config.clone(),
-                    None,
+                    out_format,
                 );
                 let result = pipeline
                     .run(file, &output_file)
@@ -1279,6 +1280,7 @@ fn cmd_config(action: Option<ConfigAction>, console: &ConsoleManager) -> error::
                 FormatChoice::Preserve => config::OutputFormat::Preserve,
                 FormatChoice::Mp3 => config::OutputFormat::Mp3,
                 FormatChoice::Wav => config::OutputFormat::Wav,
+                FormatChoice::Flac | FormatChoice::Aac => config::OutputFormat::Preserve,
             };
             preset_config.backup_originals = backup;
             preset_config.verification.auto_verify = verify;
@@ -1300,6 +1302,20 @@ fn cmd_config(action: Option<ConfigAction>, console: &ConsoleManager) -> error::
             console.success("Configuration reset to defaults");
             Ok(())
         }
+    }
+}
+
+fn resolve_output_format(format: FormatChoice) -> error::Result<Option<audio::AudioFormat>> {
+    match format {
+        FormatChoice::Preserve => Ok(None),
+        FormatChoice::Mp3 => Ok(Some(audio::AudioFormat::Mp3)),
+        FormatChoice::Wav => Ok(Some(audio::AudioFormat::Wav)),
+        FormatChoice::Flac => Err(error::PolezError::UnsupportedFormat(
+            "FLAC encoding is not yet supported; use wav or mp3".into(),
+        )),
+        FormatChoice::Aac => Err(error::PolezError::UnsupportedFormat(
+            "AAC encoding is not supported; use wav or mp3".into(),
+        )),
     }
 }
 
