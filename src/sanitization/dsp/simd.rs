@@ -27,7 +27,8 @@ pub fn multiply_into(a: &[f32], b: &[f32], out: &mut [f32]) {
 }
 
 /// Compute sum of squares of an f32 slice (for RMS).
-/// Uses 4 accumulators to enable vectorized reduction.
+/// Uses 4 f64 accumulators — the f32→f64 promotion sacrifices SIMD lane width
+/// for numerical precision when accumulating many squared values.
 #[inline]
 pub fn sum_of_squares(data: &[f32]) -> f64 {
     let mut acc0: f64 = 0.0;
