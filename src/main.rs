@@ -17,6 +17,7 @@ use std::process;
 use std::time::Instant;
 
 use clap::Parser;
+use serde::Serialize;
 
 use cli::{Cli, Commands, ConfigAction, FormatChoice};
 use config::ConfigManager;
@@ -26,6 +27,41 @@ use ui::banners::BannerManager;
 use ui::console::{
     AnalysisDisplay, BatchSummaryDisplay, ConsoleManager, SanitizationDisplay, VerificationDisplay,
 };
+
+#[derive(Serialize)]
+struct JsonReport {
+    file_path: String,
+    format: String,
+    duration_secs: f64,
+    sample_rate: u32,
+    channels: usize,
+    watermark: detection::WatermarkResult,
+    metadata: detection::MetadataScanResult,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    statistical: Option<detection::StatisticalResult>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    polez: Option<detection::PolezDetectionResult>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sanitization: Option<SanitizationReport>,
+}
+
+#[derive(Serialize)]
+struct SanitizationReport {
+    success: bool,
+    metadata_removed: usize,
+    patterns_found: usize,
+    patterns_suppressed: usize,
+    quality_loss: f64,
+    processing_time: f64,
+    output_file: String,
+}
+
+fn write_json_report(report: &JsonReport, path: &Path) -> error::Result<()> {
+    let json = serde_json::to_string_pretty(report)
+        .map_err(|e| error::PolezError::Other(anyhow::anyhow!("JSON serialization error: {e}")))?;
+    std::fs::write(path, json)?;
+    Ok(())
+}
 
 fn main() {
     tracing_subscriber::fmt()
@@ -66,6 +102,7 @@ fn run_command(
             backup,
             dry_run,
             format,
+            report,
             flags,
             fp_flags,
         } => cmd_clean(
@@ -75,6 +112,7 @@ fn run_command(
             verify,
             backup,
             dry_run,
+            report.as_deref(),
             format,
             flags.into(),
             fp_flags.into(),
@@ -104,7 +142,11 @@ fn run_command(
             console,
             banner,
         ),
-        Commands::Detect { input_file, deep } => cmd_detect(&input_file, deep, console),
+        Commands::Detect {
+            input_file,
+            deep,
+            report,
+        } => cmd_detect(&input_file, deep, report.as_deref(), console),
         Commands::Benchmark {
             directory,
             output,
@@ -154,6 +196,7 @@ fn cmd_clean(
     verify: bool,
     backup: bool,
     dry_run: bool,
+    report: Option<&Path>,
     format: FormatChoice,
     flags: config::AdvancedFlags,
     fp_config: config::FingerprintRemovalConfig,
@@ -240,6 +283,22 @@ fn cmd_clean(
     }
 
     if dry_run {
+        if let Some(report_path) = report {
+            let json_report = JsonReport {
+                file_path: input_file.display().to_string(),
+                format: src_format.to_string(),
+                duration_secs: audio_buf.duration_secs(),
+                sample_rate: audio_buf.sample_rate,
+                channels: audio_buf.num_channels(),
+                watermark: watermark_result,
+                metadata: scan_result,
+                statistical: None,
+                polez: None,
+                sanitization: None,
+            };
+            write_json_report(&json_report, report_path)?;
+            console.success(&format!("Report saved to: {}", report_path.display()));
+        }
         console.info("Dry run complete — no output file written.");
         return Ok(());
     }
@@ -280,6 +339,31 @@ fn cmd_clean(
             quality_score: Some(v.quality_score),
             verdict: Some((verdict_text.to_string(), verdict_color.to_string())),
         });
+    }
+
+    if let Some(report_path) = report {
+        let json_report = JsonReport {
+            file_path: input_file.display().to_string(),
+            format: src_format.to_string(),
+            duration_secs: audio_buf.duration_secs(),
+            sample_rate: audio_buf.sample_rate,
+            channels: audio_buf.num_channels(),
+            watermark: watermark_result,
+            metadata: scan_result,
+            statistical: None,
+            polez: None,
+            sanitization: Some(SanitizationReport {
+                success: result.success,
+                metadata_removed: result.metadata_removed,
+                patterns_found: result.patterns_found,
+                patterns_suppressed: result.patterns_suppressed,
+                quality_loss: result.quality_loss,
+                processing_time: result.processing_time,
+                output_file: result.output_file.display().to_string(),
+            }),
+        };
+        write_json_report(&json_report, report_path)?;
+        console.success(&format!("Report saved to: {}", report_path.display()));
     }
 
     if result.success {
@@ -455,7 +539,12 @@ fn cmd_sweep(
     Ok(())
 }
 
-fn cmd_detect(input_file: &Path, deep: bool, console: &ConsoleManager) -> error::Result<()> {
+fn cmd_detect(
+    input_file: &Path,
+    deep: bool,
+    report: Option<&Path>,
+    console: &ConsoleManager,
+) -> error::Result<()> {
     if !input_file.exists() {
         return Err(error::PolezError::FileNotFound(input_file.to_path_buf()));
     }
@@ -475,15 +564,14 @@ fn cmd_detect(input_file: &Path, deep: bool, console: &ConsoleManager) -> error:
 
     let polez_result = detection::PolezDetector::detect(&audio_buf);
 
-    let (ai_probability, anomaly_count) = if deep {
-        let stat_result = StatisticalAnalyzer::analyze(&audio_buf);
-        (
-            Some(stat_result.ai_probability),
-            stat_result.anomalies.len(),
-        )
+    let stat_result = if deep {
+        Some(StatisticalAnalyzer::analyze(&audio_buf))
     } else {
-        (None, 0)
+        None
     };
+
+    let ai_probability = stat_result.as_ref().map(|s| s.ai_probability);
+    let anomaly_count = stat_result.as_ref().map(|s| s.anomalies.len()).unwrap_or(0);
 
     let threats_found = scan_result.tags.len()
         + scan_result.suspicious_chunks.len()
@@ -518,6 +606,23 @@ fn cmd_detect(input_file: &Path, deep: bool, console: &ConsoleManager) -> error:
         "HIGH" => console.error("HIGH THREAT LEVEL - This file is heavily watermarked!"),
         "MEDIUM" => console.warning("MEDIUM THREAT LEVEL - Some traces detected"),
         _ => console.success("LOW THREAT LEVEL - Relatively clean"),
+    }
+
+    if let Some(report_path) = report {
+        let json_report = JsonReport {
+            file_path: input_file.display().to_string(),
+            format: src_format.to_string(),
+            duration_secs: audio_buf.duration_secs(),
+            sample_rate: audio_buf.sample_rate,
+            channels: audio_buf.num_channels(),
+            watermark: watermark_result,
+            metadata: scan_result,
+            statistical: stat_result,
+            polez: Some(polez_result),
+            sanitization: None,
+        };
+        write_json_report(&json_report, report_path)?;
+        console.success(&format!("Report saved to: {}", report_path.display()));
     }
 
     Ok(())

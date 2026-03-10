@@ -48,6 +48,10 @@ pub enum Commands {
         #[arg(short, long, value_enum, default_value = "preserve")]
         format: FormatChoice,
 
+        /// Export JSON analysis report to file
+        #[arg(long)]
+        report: Option<PathBuf>,
+
         #[command(flatten)]
         flags: AdvancedFlagsCli,
 
@@ -100,6 +104,10 @@ pub enum Commands {
         /// Enable deep analysis (slower but more thorough)
         #[arg(long)]
         deep: bool,
+
+        /// Export JSON analysis report to file
+        #[arg(long)]
+        report: Option<PathBuf>,
     },
 
     /// Batch scan directory and output CSV results for dataset analysis
