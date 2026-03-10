@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::detection::{
     metadata_scan::MetadataScanResult, polez::PolezDetectionResult, statistical::StatisticalResult,
@@ -121,4 +122,24 @@ pub struct CleanResponse {
     pub before: AllAnalysisResult,
     pub after: AllAnalysisResult,
     pub verification: VerificationResult,
+}
+
+#[derive(Deserialize)]
+pub struct BatchCleanQuery {
+    pub mode: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct BatchFileResult {
+    pub filename: String,
+    pub success: bool,
+    pub error: Option<String>,
+    pub quality_loss: Option<f64>,
+    pub processing_time: Option<f64>,
+}
+
+#[derive(Serialize)]
+pub struct BatchCleanResponse {
+    pub results: Vec<BatchFileResult>,
+    pub download_ids: HashMap<String, String>,
 }

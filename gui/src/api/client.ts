@@ -300,3 +300,34 @@ export async function saveCleanedFile(): Promise<void> {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+export interface BatchFileResult {
+  filename: string;
+  success: boolean;
+  error: string | null;
+  quality_loss: number | null;
+  processing_time: number | null;
+}
+
+export interface BatchCleanResponse {
+  results: BatchFileResult[];
+  download_ids: Record<string, string>;
+}
+
+export async function batchClean(files: File[], mode: string): Promise<BatchCleanResponse> {
+  const form = new FormData();
+  for (const file of files) {
+    form.append('files', file);
+  }
+  const params = new URLSearchParams({ mode });
+  const res = await fetch(`${BASE}/api/batch/clean?${params}`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export function getBatchDownloadUrl(id: string): string {
+  return `${BASE}/api/batch/download/${id}`;
+}

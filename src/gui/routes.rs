@@ -27,8 +27,9 @@ use crate::sanitization::SanitizationPipeline;
 use crate::verification;
 
 use super::types::{
-    AllAnalysisResult, BitPlaneData, CleanRequest, CleanResponse, FileInfo, PlaneSummary,
-    PresetInfo, SpectrogramData, VerificationResult, WaveformData,
+    AllAnalysisResult, BatchCleanResponse, BatchFileResult, BitPlaneData, CleanRequest,
+    CleanResponse, FileInfo, PlaneSummary, PresetInfo, SpectrogramData, VerificationResult,
+    WaveformData,
 };
 use super::SharedState;
 
@@ -105,6 +106,8 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/analyze/metadata", post(analyze_metadata))
         .route("/api/analyze/all", post(analyze_all))
         .route("/api/clean", post(clean_file))
+        .route("/api/batch/clean", post(batch_clean))
+        .route("/api/batch/download/{id}", get(batch_download))
         .route("/api/save", post(save_cleaned_file))
         .route_layer(middleware::from_fn_with_state(
             limiter,
@@ -1065,6 +1068,197 @@ async fn save_cleaned_file(
     };
 
     let filename = format!("cleaned_output.{ext}");
+    let content_type = if ext == "mp3" {
+        "audio/mpeg"
+    } else {
+        "audio/wav"
+    };
+
+    Ok((
+        [
+            (header::CONTENT_TYPE, content_type),
+            (
+                header::CONTENT_DISPOSITION,
+                &format!("attachment; filename=\"{filename}\""),
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
+}
+
+async fn batch_clean(
+    State(state): State<SharedState>,
+    Query(query): Query<super::types::BatchCleanQuery>,
+    mut multipart: Multipart,
+) -> Result<Json<BatchCleanResponse>, (StatusCode, String)> {
+    let mode = match query.mode.as_deref().unwrap_or("standard") {
+        "fast" => SanitizationMode::Fast,
+        "standard" => SanitizationMode::Standard,
+        "preserving" => SanitizationMode::Preserving,
+        "aggressive" => SanitizationMode::Aggressive,
+        other => return Err((StatusCode::BAD_REQUEST, format!("Unknown mode: {other}"))),
+    };
+
+    let mut results = Vec::new();
+    let mut download_ids = std::collections::HashMap::new();
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Multipart read error: {e}"),
+        )
+    })? {
+        let filename = field.file_name().unwrap_or("unknown").to_string();
+        let ext = std::path::Path::new(&filename)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("wav")
+            .to_string();
+
+        let data = field.bytes().await.map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                format!("Failed to read file data: {e}"),
+            )
+        })?;
+
+        // Write to temp input file
+        let input_tmp = tempfile::Builder::new()
+            .suffix(&format!(".{ext}"))
+            .tempfile()
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Temp file error: {e}"),
+                )
+            })?;
+        let input_path = input_tmp.into_temp_path();
+        std::fs::write(&input_path, &data).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Write error: {e}"),
+            )
+        })?;
+
+        // Create output temp file
+        let output_tmp = tempfile::Builder::new()
+            .suffix(&format!("_cleaned.{ext}"))
+            .tempfile()
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Temp file error: {e}"),
+                )
+            })?;
+        let output_tmp_path = output_tmp.into_temp_path();
+        let output_path = output_tmp_path.to_path_buf();
+        output_tmp_path.keep().map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Temp path error: {e}"),
+            )
+        })?;
+
+        let input_buf = input_path.to_path_buf();
+        let out_buf = output_path.clone();
+        let file_mode = mode;
+
+        let result = tokio::task::spawn_blocking(move || {
+            let cfg = default_config();
+            let flags = AdvancedFlags::default();
+            let pipeline = SanitizationPipeline::new(
+                file_mode,
+                false,
+                2,
+                flags,
+                cfg.fingerprint_removal,
+                None,
+                Vec::new(),
+                None,
+                None,
+            );
+            let start = std::time::Instant::now();
+            let run_result = pipeline.run(&input_buf, &out_buf);
+            (run_result, start.elapsed())
+        })
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Task error: {e}"),
+            )
+        })?;
+
+        match result {
+            (Ok(san_result), elapsed) => {
+                let id = uuid_simple();
+                {
+                    let mut s = state.write().await;
+                    s.temp_paths.push(output_path.clone());
+                    s.temp_paths.push(input_path.to_path_buf());
+                }
+                download_ids.insert(filename.clone(), id.clone());
+                // Store download path in a simple global map
+                BATCH_DOWNLOADS.lock().unwrap().insert(id, output_path);
+                results.push(BatchFileResult {
+                    filename,
+                    success: true,
+                    error: None,
+                    quality_loss: Some(san_result.quality_loss),
+                    processing_time: Some(elapsed.as_secs_f64()),
+                });
+            }
+            (Err(e), _) => {
+                results.push(BatchFileResult {
+                    filename,
+                    success: false,
+                    error: Some(e.to_string()),
+                    quality_loss: None,
+                    processing_time: None,
+                });
+            }
+        }
+    }
+
+    Ok(Json(BatchCleanResponse {
+        results,
+        download_ids,
+    }))
+}
+
+static BATCH_DOWNLOADS: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<String, std::path::PathBuf>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+fn uuid_simple() -> String {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    format!("{:016x}{:016x}", rng.gen::<u64>(), rng.gen::<u64>())
+}
+
+async fn batch_download(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Response, (StatusCode, String)> {
+    let path = BATCH_DOWNLOADS
+        .lock()
+        .unwrap()
+        .get(&id)
+        .cloned()
+        .ok_or((StatusCode::NOT_FOUND, "Download not found".to_string()))?;
+
+    let bytes = std::fs::read(&path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Read error: {e}"),
+        )
+    })?;
+
+    let filename = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("cleaned.wav");
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("wav");
     let content_type = if ext == "mp3" {
         "audio/mpeg"
     } else {

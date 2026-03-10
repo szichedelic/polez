@@ -10,6 +10,7 @@ import { CleanPanel } from './components/CleanPanel';
 import { AudioPlayer } from './components/AudioPlayer';
 import { ComparisonTimeline } from './components/ComparisonTimeline';
 import { MetadataViewer } from './components/MetadataViewer';
+import { BatchPanel } from './components/BatchPanel';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function App() {
@@ -68,6 +69,10 @@ function App() {
 
         <ErrorBoundary section="Comparison">
           <ComparisonTimeline fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
+        </ErrorBoundary>
+
+        <ErrorBoundary section="Batch Processing">
+          <BatchPanel />
         </ErrorBoundary>
       </div>
     </div>
