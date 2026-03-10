@@ -1,4 +1,5 @@
 use ndarray::Array2;
+use zeroize::Zeroize;
 
 /// Central audio data type. Samples are f32 in range [-1.0, 1.0].
 /// Shape: (num_samples, num_channels)
@@ -230,6 +231,19 @@ impl AudioBuffer {
         }
 
         AudioBuffer::new(output, sample_rate)
+    }
+}
+
+impl Drop for AudioBuffer {
+    fn drop(&mut self) {
+        if let Some(slice) = self.samples.as_slice_mut() {
+            slice.zeroize();
+        } else {
+            // Non-contiguous layout: zero element-by-element
+            for val in self.samples.iter_mut() {
+                val.zeroize();
+            }
+        }
     }
 }
 

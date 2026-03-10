@@ -54,6 +54,9 @@ thiserror = "2"
 # Hashing
 sha2 = "0.10"
 
+# Security
+zeroize = "1"
+
 # Serialization
 serde_json = "1"
 
