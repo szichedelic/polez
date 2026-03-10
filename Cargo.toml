@@ -81,9 +81,11 @@ gui = ["dep:axum", "dep:tokio", "dep:tower-http", "dep:rust-embed", "dep:open", 
 
 [dev-dependencies]
 assert_cmd = "2"
+http-body-util = "0.1"
 predicates = "3"
 proptest = "1"
 tempfile = "3"
+tower = { version = "0.5", features = ["util"] }
 
 [[bin]]
 name = "polez"

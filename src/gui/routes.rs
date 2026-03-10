@@ -1322,3 +1322,273 @@ async fn batch_download(
     )
         .into_response())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use http_body_util::BodyExt;
+    use tokio::sync::RwLock;
+    use tower::ServiceExt;
+
+    fn test_state() -> SharedState {
+        Arc::new(RwLock::new(super::super::AppState::new()))
+    }
+
+    fn test_app() -> Router {
+        create_router(test_state())
+    }
+
+    async fn state_with_audio() -> SharedState {
+        let state = Arc::new(RwLock::new(super::super::AppState::new()));
+        let samples: Vec<f32> = (0..4410)
+            .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 44100.0).sin())
+            .collect();
+        let buffer = crate::audio::AudioBuffer::from_mono(samples, 44100);
+        let cache = super::super::WaveformCache::from_buffer(&buffer);
+        let mut guard = state.write().await;
+        guard.buffer = Some(buffer);
+        guard.file_path = Some("/tmp/test.wav".to_string());
+        guard.format = Some("wav".to_string());
+        guard.waveform_cache = Some(cache);
+        drop(guard);
+        state
+    }
+
+    async fn app_with_audio() -> Router {
+        create_router(state_with_audio().await)
+    }
+
+    async fn get_status(app: Router, uri: &str) -> StatusCode {
+        let req = axum::http::Request::builder()
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap();
+        app.oneshot(req).await.unwrap().status()
+    }
+
+    async fn get_body(app: Router, uri: &str) -> (StatusCode, String) {
+        let req = axum::http::Request::builder()
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        (status, String::from_utf8_lossy(&body).to_string())
+    }
+
+    async fn post_json(app: Router, uri: &str, body: &str) -> (StatusCode, String) {
+        let req = axum::http::Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        (status, String::from_utf8_lossy(&bytes).to_string())
+    }
+
+    #[tokio::test]
+    async fn test_health() {
+        let (status, body) = get_body(test_app(), "/api/health").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, "ok");
+    }
+
+    #[tokio::test]
+    async fn test_limits() {
+        let (status, body) = get_body(test_app(), "/api/limits").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(json["max_upload_bytes"], 500 * 1024 * 1024);
+        assert!(json["supported_formats"].is_array());
+    }
+
+    #[tokio::test]
+    async fn test_presets() {
+        let (status, body) = get_body(test_app(), "/api/presets").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
+        assert!(!json.is_empty());
+        assert!(json[0]["name"].is_string());
+    }
+
+    #[tokio::test]
+    async fn test_session_no_file() {
+        let (status, body) = get_body(test_app(), "/api/session").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(json["file_loaded"], false);
+        assert!(json["file_info"].is_null());
+    }
+
+    #[tokio::test]
+    async fn test_session_with_file() {
+        let (status, body) = get_body(app_with_audio().await, "/api/session").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(json["file_loaded"], true);
+        assert_eq!(json["file_info"]["sample_rate"], 44100);
+    }
+
+    #[tokio::test]
+    async fn test_waveform_no_file() {
+        let status = get_status(test_app(), "/api/waveform?width=512").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_waveform_with_file() {
+        let (status, body) = get_body(app_with_audio().await, "/api/waveform?width=256").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(json["min"].is_array());
+        assert!(json["max"].is_array());
+        assert_eq!(json["sample_rate"], 44100);
+    }
+
+    #[tokio::test]
+    async fn test_spectrogram_no_file() {
+        let status = get_status(test_app(), "/api/spectrogram").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_spectrogram_with_file() {
+        let (status, body) =
+            get_body(app_with_audio().await, "/api/spectrogram?fft_size=256").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(json["magnitudes"].is_array());
+        assert!(json["num_freq_bins"].as_u64().unwrap() > 0);
+    }
+
+    #[tokio::test]
+    async fn test_bitplane_no_file() {
+        let status = get_status(test_app(), "/api/bitplane").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_bitplane_with_file() {
+        let (status, body) = get_body(app_with_audio().await, "/api/bitplane").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(json["planes"].as_array().unwrap().len(), 8);
+    }
+
+    #[tokio::test]
+    async fn test_analyze_watermark_no_file() {
+        let (status, _) = post_json(test_app(), "/api/analyze/watermark", "").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_analyze_watermark_with_file() {
+        let (status, body) = post_json(app_with_audio().await, "/api/analyze/watermark", "").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(json["detected"].is_array());
+    }
+
+    #[tokio::test]
+    async fn test_analyze_polez_no_file() {
+        let (status, _) = post_json(test_app(), "/api/analyze/polez", "").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_analyze_polez_with_file() {
+        let (status, body) = post_json(app_with_audio().await, "/api/analyze/polez", "").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(json["signals"].is_object());
+    }
+
+    #[tokio::test]
+    async fn test_analyze_statistical_no_file() {
+        let (status, _) = post_json(test_app(), "/api/analyze/statistical", "").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_analyze_statistical_with_file() {
+        let (status, body) =
+            post_json(app_with_audio().await, "/api/analyze/statistical", "").await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(json.is_object());
+    }
+
+    #[tokio::test]
+    async fn test_analyze_metadata_no_file() {
+        let (status, _) = post_json(test_app(), "/api/analyze/metadata", "").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_analyze_all_no_file() {
+        let (status, _) = post_json(test_app(), "/api/analyze/all", "").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_serve_audio_no_file() {
+        let status = get_status(test_app(), "/api/audio").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_serve_cleaned_audio_no_file() {
+        let status = get_status(test_app(), "/api/audio/cleaned").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_cleaned_waveform_no_file() {
+        let status = get_status(test_app(), "/api/waveform/cleaned").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_cleaned_spectrogram_no_file() {
+        let status = get_status(test_app(), "/api/spectrogram/cleaned").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_load_nonexistent_file() {
+        let (status, _) =
+            post_json(test_app(), "/api/load", r#"{"path":"/nonexistent.wav"}"#).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_clean_no_file() {
+        let (status, _) = post_json(test_app(), "/api/clean", r#"{"mode":"fast"}"#).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_save_no_cleaned_file() {
+        let (status, _) = post_json(test_app(), "/api/save", r#"{"path":"/tmp/out.wav"}"#).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_batch_download_not_found() {
+        let status = get_status(test_app(), "/api/batch/download/nonexistent").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_static_fallback_returns_response() {
+        // Requesting unknown path should hit the static handler (404 or index)
+        let status = get_status(test_app(), "/unknown-path").await;
+        // Without built frontend assets, this will be NOT_FOUND
+        assert!(status == StatusCode::OK || status == StatusCode::NOT_FOUND);
+    }
+}
