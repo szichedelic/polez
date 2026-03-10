@@ -3,6 +3,7 @@ use axum::http::HeaderValue;
 use axum::{
     extract::{Multipart, Query, State},
     http::{header, StatusCode},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -12,6 +13,8 @@ use rustfft::FftPlanner;
 use serde::Deserialize;
 use std::io::Write;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 use crate::config::{
@@ -29,6 +32,52 @@ use super::types::{
 };
 use super::SharedState;
 
+#[derive(Clone)]
+struct RateLimiter {
+    tokens: Arc<AtomicU64>,
+    max_tokens: u64,
+}
+
+impl RateLimiter {
+    fn new(max_per_second: u64) -> Self {
+        let limiter = Self {
+            tokens: Arc::new(AtomicU64::new(max_per_second)),
+            max_tokens: max_per_second,
+        };
+        let tokens = limiter.tokens.clone();
+        let max = limiter.max_tokens;
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
+            loop {
+                interval.tick().await;
+                tokens.store(max, Ordering::Relaxed);
+            }
+        });
+        limiter
+    }
+}
+
+async fn rate_limit_middleware(
+    State(limiter): State<RateLimiter>,
+    request: axum::http::Request<axum::body::Body>,
+    next: Next,
+) -> Response {
+    // Atomically decrement; if previous value was already 0, reject.
+    // Wrapping subtract is safe: the refill task resets to max every second.
+    let prev = limiter.tokens.fetch_sub(1, Ordering::Relaxed);
+    if prev == 0 {
+        // Undo the subtract that would wrap around
+        limiter.tokens.fetch_add(1, Ordering::Relaxed);
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            [(header::RETRY_AFTER, "1")],
+            "Rate limit exceeded. Try again later.",
+        )
+            .into_response();
+    }
+    next.run(request).await
+}
+
 pub fn create_router(state: SharedState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
@@ -41,27 +90,41 @@ pub fn create_router(state: SharedState) -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    Router::new()
-        .route("/api/session", get(get_session))
-        .route("/api/health", get(health))
-        .route("/api/limits", get(get_limits))
+    let limiter = RateLimiter::new(10);
+
+    // Rate-limited processing endpoints (10 req/s → 429 when exceeded)
+    let rate_limited_routes = Router::new()
         .route("/api/load", post(load_file))
         .route("/api/upload", post(upload_file))
         .route("/api/waveform", get(get_waveform))
         .route("/api/spectrogram", get(get_spectrogram))
         .route("/api/bitplane", get(get_bitplane))
-        .route("/api/audio", get(serve_audio))
         .route("/api/analyze/watermark", post(analyze_watermark))
         .route("/api/analyze/polez", post(analyze_polez))
         .route("/api/analyze/statistical", post(analyze_statistical))
         .route("/api/analyze/metadata", post(analyze_metadata))
         .route("/api/analyze/all", post(analyze_all))
-        .route("/api/presets", get(list_presets))
         .route("/api/clean", post(clean_file))
+        .route("/api/save", post(save_cleaned_file))
+        .route_layer(middleware::from_fn_with_state(
+            limiter,
+            rate_limit_middleware,
+        ));
+
+    // Unrated routes (health, session, static assets, audio serving)
+    let unrated_routes = Router::new()
+        .route("/api/session", get(get_session))
+        .route("/api/health", get(health))
+        .route("/api/limits", get(get_limits))
+        .route("/api/presets", get(list_presets))
+        .route("/api/audio", get(serve_audio))
         .route("/api/audio/cleaned", get(serve_cleaned_audio))
         .route("/api/waveform/cleaned", get(get_cleaned_waveform))
-        .route("/api/spectrogram/cleaned", get(get_cleaned_spectrogram))
-        .route("/api/save", post(save_cleaned_file))
+        .route("/api/spectrogram/cleaned", get(get_cleaned_spectrogram));
+
+    Router::new()
+        .merge(rate_limited_routes)
+        .merge(unrated_routes)
         .fallback(get(static_handler))
         .layer(DefaultBodyLimit::max(MAX_UPLOAD_BYTES))
         .layer(cors)
