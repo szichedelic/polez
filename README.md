@@ -179,6 +179,12 @@ The `--paranoid` flag forces Aggressive mode with 2 additional passes.
 | WAV | Yes | Yes |
 | MP3 | Yes | Yes |
 
+## Documentation
+
+- [Algorithm Reference](docs/algorithms.md) — detection methods, stealth operations, and parameter details
+- [Configuration Guide](docs/configuration.md) — config file format, presets, and environment variables
+- [Troubleshooting & FAQ](docs/troubleshooting.md) — common issues and solutions
+
 ## License
 
 MIT
