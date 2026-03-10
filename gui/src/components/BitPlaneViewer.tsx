@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { getBitPlane, type BitPlaneData } from '../api/client';
+import { useColorblind } from '../hooks/useColorblind';
 
 interface Props {
   fileLoaded: boolean;
 }
 
 export function BitPlaneViewer({ fileLoaded }: Props) {
+  const { palette } = useColorblind();
   const [data, setData] = useState<BitPlaneData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -37,14 +39,14 @@ export function BitPlaneViewer({ fileLoaded }: Props) {
                 <span className="text-zinc-500 text-xs w-20">
                   Plane {plane.bit} {plane.bit === 0 ? '(LSB)' : plane.bit === 7 ? '(MSB)' : ''}
                 </span>
-                <div className="flex-1 h-3 bg-zinc-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={barWidth} aria-valuemin={0} aria-valuemax={100} aria-label={`Plane ${plane.bit} ones ratio: ${(plane.ones_ratio * 100).toFixed(2)}%`}>
+                <div className="flex-1 h-3 bg-zinc-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={barWidth} aria-valuemin={0} aria-valuemax={100} aria-label={`Plane ${plane.bit} ones ratio: ${(plane.ones_ratio * 100).toFixed(2)}%${biased ? ' (biased)' : ''}`}>
                   <div
-                    className={`h-full rounded-full ${biased ? 'bg-red-500' : 'bg-green-500'}`}
+                    className={`h-full rounded-full ${biased ? palette.biased.bg : palette.normal.bg}`}
                     style={{ width: `${barWidth}%` }}
                   />
                 </div>
-                <span className={`text-xs w-16 text-right ${biased ? 'text-red-400' : 'text-zinc-500'}`}>
-                  {(plane.ones_ratio * 100).toFixed(2)}%
+                <span className={`text-xs w-20 text-right ${biased ? palette.biased.text : palette.normal.text}`}>
+                  {biased ? '\u26A0 ' : ''}{(plane.ones_ratio * 100).toFixed(2)}%
                 </span>
               </div>
             );

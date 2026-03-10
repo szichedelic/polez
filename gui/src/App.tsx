@@ -13,12 +13,14 @@ import { MetadataViewer } from './components/MetadataViewer';
 import { BatchPanel } from './components/BatchPanel';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useKeyboardShortcuts, SHORTCUT_LIST } from './hooks/useKeyboardShortcuts';
+import { useColorblind } from './hooks/useColorblind';
 
 function App() {
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [hasCleaned, setHasCleaned] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const { enabled: colorblindMode, toggle: toggleColorblind } = useColorblind();
 
   useEffect(() => {
     getSession().then((session) => {
@@ -117,7 +119,22 @@ function App() {
         </ErrorBoundary>
       </header>
 
-      <main className="p-4 space-y-4">
+      <div className="flex justify-end px-4 pt-2">
+        <button
+          onClick={toggleColorblind}
+          className={`text-xs px-2.5 py-1 rounded border min-h-[44px] sm:min-h-0 ${
+            colorblindMode
+              ? 'border-sky-500 text-sky-400 bg-sky-500/10'
+              : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'
+          }`}
+          aria-label={colorblindMode ? 'Disable colorblind-safe palette' : 'Enable colorblind-safe palette'}
+          aria-pressed={colorblindMode}
+        >
+          {colorblindMode ? '\u25CF Colorblind Mode' : '\u25CB Colorblind Mode'}
+        </button>
+      </div>
+
+      <main className="px-4 pb-4 space-y-4">
         <ErrorBoundary section="Audio Player">
           <AudioPlayer fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
         </ErrorBoundary>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { cleanFile, saveCleanedFile, getPresets, DEFAULT_ADVANCED_FLAGS, DEFAULT_FINGERPRINT_FLAGS } from '../api/client';
 import type { CleanResponse, VerificationResult as VerResult, PresetInfo, AdvancedFlags, FingerprintFlags } from '../api/client';
+import { useColorblind } from '../hooks/useColorblind';
 
 interface Props {
   fileLoaded: boolean;
@@ -8,17 +9,18 @@ interface Props {
 }
 
 function ConfidenceBar({ label, value, max = 1 }: { label: string; value: number; max?: number }) {
+  const { confidenceColor } = useColorblind();
   const pct = (value / max) * 100;
-  const color = pct > 70 ? 'bg-red-500' : pct > 40 ? 'bg-yellow-500' : 'bg-green-500';
+  const { bg, label: indicator } = confidenceColor(pct);
 
   return (
     <div className="mb-2">
       <div className="flex justify-between text-sm mb-1">
-        <span className="text-zinc-300">{label}</span>
+        <span className="text-zinc-300">{indicator ? `${indicator} ${label}` : label}</span>
         <span className="text-zinc-400">{pct.toFixed(1)}%</span>
       </div>
       <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+        <div className={`h-full ${bg} rounded-full`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -47,17 +49,11 @@ function DetectionColumn({ title, data }: { title: string; data: any }) {
   );
 }
 
-const GRADE_COLORS: Record<string, string> = {
-  A: 'text-green-400 border-green-500',
-  B: 'text-emerald-400 border-emerald-500',
-  C: 'text-yellow-400 border-yellow-500',
-  D: 'text-orange-400 border-orange-500',
-  F: 'text-red-400 border-red-500',
-};
-
 function VerificationPanel({ verification: v }: { verification: VerResult }) {
-  const gradeStyle = GRADE_COLORS[v.grade] || 'text-zinc-400 border-zinc-500';
+  const { palette } = useColorblind();
+  const gradeStyle = palette.grades[v.grade] || 'text-zinc-400 border-zinc-500';
   const snrDisplay = isFinite(v.snr_db) ? `${v.snr_db.toFixed(1)} dB` : 'Infinite';
+  const verdictStyle = palette.verdictColor(v.verdict_color);
 
   return (
     <div className="bg-zinc-800 border border-zinc-700 rounded p-3 mb-3">
@@ -67,7 +63,7 @@ function VerificationPanel({ verification: v }: { verification: VerResult }) {
         </div>
         <div>
           <div className="text-sm font-medium text-zinc-200">Quality Grade</div>
-          <div className={`text-xs ${v.verdict_color === 'green' ? 'text-green-400' : v.verdict_color === 'yellow' ? 'text-yellow-400' : 'text-red-400'}`}>
+          <div className={`text-xs ${verdictStyle}`}>
             {v.verdict}
           </div>
         </div>

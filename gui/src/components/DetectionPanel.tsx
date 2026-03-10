@@ -1,22 +1,24 @@
 import { useState } from 'react';
 import { analyzeAll, analyzeWatermark, analyzePolez, analyzeStatistical, analyzeMetadata } from '../api/client';
+import { useColorblind } from '../hooks/useColorblind';
 
 interface Props {
   fileLoaded: boolean;
 }
 
 function ConfidenceBar({ label, value, max = 1 }: { label: string; value: number; max?: number }) {
+  const { confidenceColor } = useColorblind();
   const pct = (value / max) * 100;
-  const color = pct > 70 ? 'bg-red-500' : pct > 40 ? 'bg-yellow-500' : 'bg-green-500';
+  const { bg, label: indicator } = confidenceColor(pct);
 
   return (
     <div className="mb-2">
       <div className="flex justify-between text-sm mb-1">
-        <span className="text-zinc-300">{label}</span>
+        <span className="text-zinc-300">{indicator ? `${indicator} ${label}` : label}</span>
         <span className="text-zinc-400">{(pct).toFixed(1)}%</span>
       </div>
       <div className="h-2 bg-zinc-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${label}: ${pct.toFixed(1)}%`}>
-        <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+        <div className={`h-full ${bg} rounded-full`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -26,6 +28,7 @@ function ConfidenceBar({ label, value, max = 1 }: { label: string; value: number
 type AnalysisResults = Record<string, any>;
 
 export function DetectionPanel({ fileLoaded }: Props) {
+  const { palette } = useColorblind();
   const [results, setResults] = useState<AnalysisResults | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -111,7 +114,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
           <div className="mt-2 space-y-1">
             {Object.entries(results.watermark.method_results as Record<string, { detected: boolean; confidence: number }>).map(([name, mr]) => (
               <div key={name} className="flex justify-between text-xs">
-                <span className={mr.detected ? 'text-red-400' : 'text-zinc-500'}>{name}</span>
+                <span className={mr.detected ? palette.detected.text : palette.notDetected.text}>{mr.detected ? '\u2717 ' : ''}{name}</span>
                 <span className="text-zinc-400">{(mr.confidence * 100).toFixed(1)}%</span>
               </div>
             ))}
