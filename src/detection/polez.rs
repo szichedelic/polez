@@ -105,14 +105,27 @@ impl PolezDetector {
         }
     }
 
-    /// Analyze ultrasonic frequency content (23-24 kHz vs 15-20 kHz).
+    /// Analyze ultrasonic frequency content near Nyquist vs a reference band.
+    ///
+    /// At 48kHz+, examines 23-24 kHz vs 15-20 kHz.
+    /// At 44.1kHz, scales bands to 20-21.5 kHz vs 13-18 kHz (below Nyquist of 22.05 kHz).
+    /// Below 44.1kHz, returns zero (insufficient bandwidth).
     fn analyze_ultrasonic(samples: &[f32], sample_rate: u32) -> (f64, f64) {
         let sample_rate = sample_rate as f64;
+        let nyquist = sample_rate / 2.0;
 
-        // Need at least 48kHz sample rate for 24kHz analysis
+        // Need at least 44.1kHz for meaningful near-Nyquist analysis
         if sample_rate < 44100.0 {
             return (0.0, 0.0);
         }
+
+        // Scale frequency bands to stay below Nyquist
+        let (ultra_lo, ultra_hi, ref_lo, ref_hi) = if nyquist >= 24000.0 {
+            (23000.0, 24000.0, 15000.0, 20000.0)
+        } else {
+            // 44.1kHz: Nyquist = 22050 Hz — use bands safely below it
+            (20000.0, 21500.0, 13000.0, 18000.0)
+        };
 
         // Take a chunk from the middle of the audio (avoid silence at start/end)
         let chunk_size = 65536.min(samples.len());
@@ -137,16 +150,16 @@ impl PolezDetector {
         let freq_resolution = sample_rate / chunk_size as f64;
 
         // Calculate energy in bands
-        let mut ultrasonic_energy = 0.0; // 23-24 kHz
-        let mut reference_energy = 0.0; // 15-20 kHz
+        let mut ultrasonic_energy = 0.0;
+        let mut reference_energy = 0.0;
 
         let ultrasonic_bins = (
-            (23000.0 / freq_resolution) as usize,
-            (24000.0 / freq_resolution) as usize,
+            (ultra_lo / freq_resolution) as usize,
+            (ultra_hi / freq_resolution) as usize,
         );
         let reference_bins = (
-            (15000.0 / freq_resolution) as usize,
-            (20000.0 / freq_resolution) as usize,
+            (ref_lo / freq_resolution) as usize,
+            (ref_hi / freq_resolution) as usize,
         );
 
         // Compute DFT for specific bins (more efficient than full FFT)
