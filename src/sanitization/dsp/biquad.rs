@@ -176,18 +176,29 @@ pub fn bandpass(freq_hz: f64, q: f64, sample_rate: u32) -> BiquadCoefficients {
 }
 
 /// Apply a biquad filter to a signal (Direct Form II Transposed).
+///
+/// The inner loop uses local coefficient copies to help the compiler keep
+/// them in registers and avoid repeated memory loads.
+#[inline]
 pub fn biquad_process(signal: &[f32], coeffs: &BiquadCoefficients) -> Vec<f32> {
     let n = signal.len();
     let mut output = vec![0.0f32; n];
+
+    // Local copies help the optimizer keep these in registers
+    let b0 = coeffs.b0;
+    let b1 = coeffs.b1;
+    let b2 = coeffs.b2;
+    let a1 = coeffs.a1;
+    let a2 = coeffs.a2;
     let mut z1 = 0.0_f64;
     let mut z2 = 0.0_f64;
 
-    for i in 0..n {
-        let x = signal[i] as f64;
-        let y = coeffs.b0 * x + z1;
-        z1 = coeffs.b1 * x - coeffs.a1 * y + z2;
-        z2 = coeffs.b2 * x - coeffs.a2 * y;
-        output[i] = y as f32;
+    for (out, &inp) in output.iter_mut().zip(signal.iter()) {
+        let x = inp as f64;
+        let y = b0 * x + z1;
+        z1 = b1 * x - a1 * y + z2;
+        z2 = b2 * x - a2 * y;
+        *out = y as f32;
     }
 
     output

@@ -136,14 +136,23 @@ impl AudioBuffer {
 
     /// RMS level across all channels.
     pub fn rms(&self) -> f32 {
-        let total: f32 = self.samples.iter().map(|&s| s * s).sum();
-        let count = self.samples.len() as f32;
-        (total / count).sqrt()
+        if let Some(slice) = self.samples.as_slice() {
+            let total = crate::sanitization::dsp::simd::sum_of_squares(slice);
+            (total / slice.len() as f64).sqrt() as f32
+        } else {
+            let total: f32 = self.samples.iter().map(|&s| s * s).sum();
+            let count = self.samples.len() as f32;
+            (total / count).sqrt()
+        }
     }
 
     /// Peak absolute value.
     pub fn peak(&self) -> f32 {
-        self.samples.iter().map(|s| s.abs()).fold(0.0f32, f32::max)
+        if let Some(slice) = self.samples.as_slice() {
+            crate::sanitization::dsp::simd::max_abs(slice)
+        } else {
+            self.samples.iter().map(|s| s.abs()).fold(0.0f32, f32::max)
+        }
     }
 
     /// Normalize RMS to target level.

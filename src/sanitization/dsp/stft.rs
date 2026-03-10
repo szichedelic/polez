@@ -2,6 +2,8 @@ use num_complex::Complex;
 use rustfft::FftPlanner;
 use std::f32::consts::PI;
 
+use super::simd;
+
 /// Compute the Short-Time Fourier Transform.
 ///
 /// The signal is zero-padded by `nperseg/2` samples on each side before
@@ -37,12 +39,15 @@ pub fn stft(signal: &[f32], nperseg: usize, noverlap: usize) -> (Vec<Vec<Complex
     let num_frames = (padded.len() - nperseg) / hop + 1;
     let mut spectrogram = Vec::with_capacity(num_frames);
 
+    let mut windowed = vec![0.0f32; nperseg];
+    let mut buf = vec![Complex::new(0.0f32, 0.0); nperseg];
+
     for frame_idx in 0..num_frames {
         let start = frame_idx * hop;
-        let mut buf: Vec<Complex<f32>> = (0..nperseg)
-            .map(|i| Complex::new(padded[start + i] * window[i], 0.0))
-            .collect();
-
+        simd::multiply_into(&padded[start..start + nperseg], &window, &mut windowed);
+        for (b, &w) in buf.iter_mut().zip(windowed.iter()) {
+            *b = Complex::new(w, 0.0);
+        }
         fft.process(&mut buf);
         spectrogram.push(buf[..n_freqs].to_vec());
     }
@@ -77,6 +82,9 @@ pub fn istft(
     let mut output = vec![0.0f32; output_len];
     let mut window_sum = vec![0.0f32; output_len];
 
+    let scale = 1.0 / nperseg as f32;
+    let mut scaled_re = vec![0.0f32; nperseg];
+
     for (frame_idx, frame) in spectrogram.iter().enumerate() {
         // Reconstruct full spectrum from positive frequencies (conjugate symmetry)
         let mut buf = vec![Complex::new(0.0f32, 0.0); nperseg];
@@ -92,24 +100,18 @@ pub fn istft(
 
         ifft.process(&mut buf);
 
-        // Normalize IFFT output (rustfft doesn't normalize)
-        let scale = 1.0 / nperseg as f32;
+        // Extract and scale real parts
+        for (i, b) in buf.iter().enumerate() {
+            scaled_re[i] = b.re * scale;
+        }
+
         let start = frame_idx * hop;
-
-        for i in 0..nperseg {
-            output[start + i] += buf[i].re * scale * window[i];
-            window_sum[start + i] += window[i] * window[i];
-        }
+        simd::multiply_accumulate(&mut output[start..start + nperseg], &scaled_re, &window);
+        simd::square_accumulate(&mut window_sum[start..start + nperseg], &window);
     }
 
-    // Normalize by window overlap sum. With zero-padding applied in `stft`,
-    // every sample in the [pad..pad+original_len] region has full overlap
-    // coverage, so window_sum is bounded well above zero throughout.
-    for i in 0..output_len {
-        if window_sum[i] > 1e-10 {
-            output[i] /= window_sum[i];
-        }
-    }
+    // Normalize by window overlap sum
+    simd::divide_where_above(&mut output, &window_sum, 1e-10);
 
     // Strip the zero-padding applied in `stft` and return exactly original_len samples.
     let pad = nperseg / 2;
