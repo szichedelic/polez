@@ -15,6 +15,18 @@ export interface ServerLimits {
   supported_formats: string[];
 }
 
+export interface SessionState {
+  file_loaded: boolean;
+  file_info: FileInfo | null;
+  has_cleaned: boolean;
+}
+
+export async function getSession(): Promise<SessionState> {
+  const res = await fetch(`${BASE}/api/session`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function getLimits(): Promise<ServerLimits> {
   const res = await fetch(`${BASE}/api/limits`);
   if (!res.ok) throw new Error(await res.text());

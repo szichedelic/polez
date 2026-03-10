@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FileInfo } from './api/client';
+import { getSession } from './api/client';
 import { FileHeader } from './components/FileHeader';
 import { Waveform } from './components/Waveform';
 import { Spectrogram } from './components/Spectrogram';
@@ -14,6 +15,15 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 function App() {
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [hasCleaned, setHasCleaned] = useState(false);
+
+  useEffect(() => {
+    getSession().then((session) => {
+      if (session.file_loaded && session.file_info) {
+        setFileInfo(session.file_info);
+        setHasCleaned(session.has_cleaned);
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleFileLoaded = (info: FileInfo) => {
     setFileInfo(info);

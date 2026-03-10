@@ -35,6 +35,7 @@ pub fn create_router(state: SharedState) -> Router {
         .allow_headers(Any);
 
     Router::new()
+        .route("/api/session", get(get_session))
         .route("/api/health", get(health))
         .route("/api/limits", get(get_limits))
         .route("/api/load", post(load_file))
@@ -83,6 +84,25 @@ async fn static_handler(uri: axum::http::Uri) -> Response {
             }
         }
     }
+}
+
+async fn get_session(State(state): State<SharedState>) -> Json<serde_json::Value> {
+    let state = state.read().await;
+    let file_info = state.buffer.as_ref().map(|buf| {
+        serde_json::json!({
+            "file_path": state.file_path,
+            "format": state.format,
+            "duration_secs": buf.duration_secs(),
+            "sample_rate": buf.sample_rate,
+            "channels": buf.num_channels(),
+        })
+    });
+    let has_cleaned = state.cleaned_buffer.is_some();
+    Json(serde_json::json!({
+        "file_loaded": file_info.is_some(),
+        "file_info": file_info,
+        "has_cleaned": has_cleaned,
+    }))
 }
 
 async fn health() -> &'static str {
