@@ -46,6 +46,7 @@ impl WatermarkDetector {
         "lsb_steganography",
         "codec_artifacts",
         "phase_coherence",
+        "spatial_encoding",
     ];
 
     /// Run all detection methods on the audio buffer.
@@ -113,6 +114,26 @@ impl WatermarkDetector {
             result
                 .method_results
                 .insert("phase_coherence".to_string(), mr);
+        }
+
+        // Spatial encoding also needs the full buffer (multi-channel analysis)
+        let run_spatial = match filter {
+            Some(f) => f.iter().any(|name| name == "spatial_encoding"),
+            None => true,
+        };
+        if run_spatial {
+            let mr = detect_spatial_encoding(buffer);
+            if mr.detected {
+                result.detected.push(WatermarkDetection {
+                    method: "spatial_encoding".to_string(),
+                    confidence: mr.confidence,
+                    description: mr.details.first().cloned().unwrap_or_default(),
+                });
+                result.watermark_count += 1;
+            }
+            result
+                .method_results
+                .insert("spatial_encoding".to_string(), mr);
         }
 
         result.overall_confidence = if result.detected.is_empty() {
@@ -992,6 +1013,215 @@ fn detect_phase_coherence(buffer: &AudioBuffer) -> MethodResult {
                     "Periodic phase pattern: segment-to-segment variation {avg_diff:.4}"
                 ));
             }
+        }
+    }
+
+    if max_confidence > 0.3 {
+        result.detected = true;
+    }
+
+    result.confidence = max_confidence;
+    result
+}
+
+/// Method 10: Spatial encoding detection.
+/// Detects watermarks embedded in spatial/surround encoding patterns.
+/// Analyzes mid/side signal ratios, inter-channel correlation at specific frequencies,
+/// and spatial encoding signatures common in broadcast and streaming audio.
+fn detect_spatial_encoding(buffer: &AudioBuffer) -> MethodResult {
+    let mut result = MethodResult::default();
+    let mut max_confidence: f64 = 0.0;
+
+    if buffer.num_samples() < 8192 {
+        return result;
+    }
+
+    if buffer.num_channels() >= 2 {
+        let left: Vec<f32> = buffer.channel(0).to_vec();
+        let right: Vec<f32> = buffer.channel(1).to_vec();
+        let sr = buffer.sample_rate;
+        let n = left.len().min(right.len());
+
+        // Test 1: Mid/side ratio analysis
+        let mid: Vec<f32> = (0..n).map(|i| (left[i] + right[i]) * 0.5).collect();
+        let side: Vec<f32> = (0..n).map(|i| (left[i] - right[i]) * 0.5).collect();
+
+        let nperseg = 2048;
+        let noverlap = nperseg * 3 / 4;
+        let (spec_mid, _) = stft::stft(&mid, nperseg, noverlap);
+        let (spec_side, _) = stft::stft(&side, nperseg, noverlap);
+
+        if !spec_mid.is_empty() && !spec_side.is_empty() {
+            let n_frames = spec_mid.len().min(spec_side.len());
+            let n_freqs = spec_mid[0].len();
+            let freq_res = sr as f64 / nperseg as f64;
+
+            let bands: &[(f64, f64, &str)] = &[
+                (200.0, 2000.0, "low"),
+                (2000.0, 6000.0, "mid"),
+                (6000.0, 12000.0, "high"),
+                (12000.0, 20000.0, "ultrasonic"),
+            ];
+
+            for &(lo, hi, band_name) in bands {
+                if lo >= sr as f64 / 2.0 {
+                    continue;
+                }
+                let lo_bin = (lo / freq_res) as usize;
+                let hi_bin = ((hi / freq_res) as usize).min(n_freqs);
+                if lo_bin >= hi_bin {
+                    continue;
+                }
+
+                let mut ms_ratios: Vec<f64> = Vec::new();
+                for f in 0..n_frames {
+                    let mut mid_energy = 0.0f64;
+                    let mut side_energy = 0.0f64;
+                    for bin in lo_bin..hi_bin {
+                        mid_energy += spec_mid[f][bin].norm() as f64;
+                        side_energy += spec_side[f][bin].norm() as f64;
+                    }
+                    if mid_energy > 1e-10 {
+                        ms_ratios.push(side_energy / mid_energy);
+                    }
+                }
+
+                if ms_ratios.is_empty() {
+                    continue;
+                }
+
+                let avg_ratio: f64 = ms_ratios.iter().sum::<f64>() / ms_ratios.len() as f64;
+                let ratio_std: f64 = {
+                    let var = ms_ratios
+                        .iter()
+                        .map(|&r| (r - avg_ratio).powi(2))
+                        .sum::<f64>()
+                        / ms_ratios.len() as f64;
+                    var.sqrt()
+                };
+
+                // Unnaturally stable M/S ratio suggests spatial encoding watermark
+                if ratio_std < 0.02 && avg_ratio > 0.01 && avg_ratio < 0.5 {
+                    let conf = ((0.05 - ratio_std) * 20.0).clamp(0.3, 0.9);
+                    max_confidence = max_confidence.max(conf);
+                    result.details.push(format!(
+                        "Stable M/S ratio in {band_name} band: avg={avg_ratio:.3}, std={ratio_std:.4}"
+                    ));
+                }
+            }
+
+            // Test 2: Frequency-specific inter-channel correlation
+            let test_freqs = [100.0, 500.0, 1000.0, 4000.0, 8000.0, 16000.0];
+            let mut anomalous_freqs = Vec::new();
+
+            let (spec_l, _) = stft::stft(&left, nperseg, noverlap);
+            let (spec_r, _) = stft::stft(&right, nperseg, noverlap);
+            let nf = spec_l.len().min(spec_r.len());
+
+            for &freq in &test_freqs {
+                if freq >= sr as f64 / 2.0 {
+                    continue;
+                }
+                let bin = (freq / freq_res) as usize;
+                if bin >= n_freqs {
+                    continue;
+                }
+
+                let l_mags: Vec<f64> = (0..nf).map(|f| spec_l[f][bin].norm() as f64).collect();
+                let r_mags: Vec<f64> = (0..nf).map(|f| spec_r[f][bin].norm() as f64).collect();
+
+                if l_mags.len() >= 4 {
+                    let corr = stats::pearson_correlation(&l_mags, &r_mags);
+                    if corr.is_finite() && corr < -0.8 {
+                        anomalous_freqs.push((freq, corr));
+                    }
+                }
+            }
+
+            if !anomalous_freqs.is_empty() {
+                let conf = (0.5 + anomalous_freqs.len() as f64 * 0.15).min(0.9);
+                max_confidence = max_confidence.max(conf);
+                let freq_list: Vec<String> = anomalous_freqs
+                    .iter()
+                    .map(|(f, c)| format!("{f:.0}Hz(r={c:.2})"))
+                    .collect();
+                result.details.push(format!(
+                    "Anti-correlated channels at: {}",
+                    freq_list.join(", ")
+                ));
+            }
+        }
+
+        // Test 3: Side-channel energy ratio
+        let side_rms: f64 =
+            (side.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / side.len() as f64).sqrt();
+        let mid_rms: f64 =
+            (mid.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / mid.len() as f64).sqrt();
+
+        if mid_rms > 1e-10 {
+            let global_ms = side_rms / mid_rms;
+            if global_ms > 0.8 {
+                let conf = ((global_ms - 0.5) * 1.5).clamp(0.3, 0.8);
+                max_confidence = max_confidence.max(conf);
+                result.details.push(format!(
+                    "High side-channel energy: M/S ratio {global_ms:.3}"
+                ));
+            }
+        }
+    } else {
+        // Mono: check for narrowband spectral insertions (spatial encoding markers)
+        let channel: Vec<f32> = buffer.channel(0).to_vec();
+        let sr = buffer.sample_rate;
+
+        let nperseg = 4096;
+        let noverlap = nperseg * 3 / 4;
+        let (spectrogram, _) = stft::stft(&channel, nperseg, noverlap);
+
+        if spectrogram.len() < 4 {
+            return result;
+        }
+
+        let n_freqs = spectrogram[0].len();
+        let freq_res = sr as f64 / nperseg as f64;
+
+        let mut avg_spectrum = vec![0.0f64; n_freqs];
+        for frame in &spectrogram {
+            for (i, val) in frame.iter().enumerate() {
+                avg_spectrum[i] += val.norm() as f64;
+            }
+        }
+        for val in &mut avg_spectrum {
+            *val /= spectrogram.len() as f64;
+        }
+
+        let spectral_median = {
+            let mut sorted = avg_spectrum.clone();
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            sorted[sorted.len() / 2]
+        };
+
+        let mut narrow_peaks = 0usize;
+        for bin in 2..n_freqs.saturating_sub(2) {
+            let val = avg_spectrum[bin];
+            let neighbors = (avg_spectrum[bin - 2]
+                + avg_spectrum[bin - 1]
+                + avg_spectrum[bin + 1]
+                + avg_spectrum[bin + 2])
+                / 4.0;
+            if val > neighbors * 3.0 && val > spectral_median * 10.0 {
+                let freq = bin as f64 * freq_res;
+                if (200.0..20000.0).contains(&freq) {
+                    narrow_peaks += 1;
+                }
+            }
+        }
+
+        if narrow_peaks >= 3 {
+            let conf = (narrow_peaks as f64 * 0.12).min(0.85);
+            max_confidence = max_confidence.max(conf);
+            result.details.push(format!(
+                "Narrowband spectral insertions: {narrow_peaks} suspicious peaks"
+            ));
         }
     }
 
