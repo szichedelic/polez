@@ -17,6 +17,14 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub json: bool,
 
+    /// Increase verbosity (-v = debug, -vv = trace)
+    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
+    pub verbose: u8,
+
+    /// Suppress all output except errors and final result
+    #[arg(short, long, global = true)]
+    pub quiet: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }

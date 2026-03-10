@@ -164,19 +164,30 @@ fn unix_timestamp_iso8601() -> String {
 }
 
 fn main() {
+    let cli = Cli::parse();
+    let json_mode = cli.json;
+    let quiet_mode = cli.quiet || json_mode;
+
+    let log_level = if cli.verbose >= 2 {
+        tracing::Level::TRACE
+    } else if cli.verbose == 1 {
+        tracing::Level::DEBUG
+    } else if quiet_mode {
+        tracing::Level::ERROR
+    } else {
+        tracing::Level::INFO
+    };
+
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
+            tracing_subscriber::EnvFilter::from_default_env().add_directive(log_level.into()),
         )
         .init();
 
-    let cli = Cli::parse();
-    let json_mode = cli.json;
     let console = ConsoleManager::new();
     let banner = BannerManager::new();
 
-    if !json_mode {
+    if !quiet_mode {
         banner.show_main_banner();
         console.warning("LEGAL DISCLAIMER: This tool is for AUTHORIZED SECURITY RESEARCH ONLY");
         console.info("  Use only on files you own or have explicit permission to modify");
