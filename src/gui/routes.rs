@@ -163,14 +163,17 @@ async fn upload_file(
     })?;
 
     let tmp_path = tmp.into_temp_path();
-    let path_str = tmp_path.to_string_lossy().to_string();
+    let persisted_path = tmp_path.to_path_buf();
+    // Keep the file on disk by persisting the TempPath (consumes it without deleting)
+    tmp_path.keep().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Temp path persist error: {e}"),
+        )
+    })?;
+    let path_str = persisted_path.to_string_lossy().to_string();
 
-    // Leak the temp path so the file persists for the session
-    let leaked: &'static std::path::Path = Box::leak(tmp_path.to_path_buf().into_boxed_path());
-    std::mem::forget(tmp_path);
-    let _ = leaked;
-
-    let (buffer, format) = crate::audio::load_audio(Path::new(&path_str)).map_err(|e| {
+    let (buffer, format) = crate::audio::load_audio(&persisted_path).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Load error: {e}"),
@@ -186,6 +189,7 @@ async fn upload_file(
     };
 
     let mut app_state = state.write().await;
+    app_state.temp_paths.push(persisted_path);
     app_state.file_path = Some(path_str);
     app_state.format = Some(info.format.clone());
     app_state.buffer = Some(buffer);
@@ -575,8 +579,13 @@ async fn clean_file(
         })?;
     let tmp_path = tmp.into_temp_path();
     let output_path = tmp_path.to_path_buf();
-    // Leak so it persists for the session
-    std::mem::forget(tmp_path);
+    // Keep the file on disk; track for cleanup when state is dropped
+    tmp_path.keep().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Temp path persist error: {e}"),
+        )
+    })?;
 
     let input_path = std::path::PathBuf::from(&file_path);
     let out = output_path.clone();
@@ -661,9 +670,10 @@ async fn clean_file(
         metadata,
     };
 
-    // Store cleaned state
+    // Store cleaned state and track temp file for cleanup
     {
         let mut s = state.write().await;
+        s.temp_paths.push(output_path);
         s.cleaned_buffer = Some(cleaned_buffer);
         s.cleaned_file_path = Some(output_path_str);
         s.cleaned_format = Some(cleaned_fmt.to_string());

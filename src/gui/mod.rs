@@ -18,6 +18,8 @@ pub struct AppState {
     pub cleaned_buffer: Option<AudioBuffer>,
     pub cleaned_file_path: Option<String>,
     pub cleaned_format: Option<String>,
+    /// Temp file paths to clean up when state is dropped
+    pub temp_paths: Vec<std::path::PathBuf>,
 }
 
 impl AppState {
@@ -29,6 +31,15 @@ impl AppState {
             cleaned_buffer: None,
             cleaned_file_path: None,
             cleaned_format: None,
+            temp_paths: Vec::new(),
+        }
+    }
+}
+
+impl Drop for AppState {
+    fn drop(&mut self) {
+        for path in &self.temp_paths {
+            let _ = std::fs::remove_file(path);
         }
     }
 }
