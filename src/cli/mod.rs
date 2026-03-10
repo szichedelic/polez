@@ -32,6 +32,13 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Sanitize all traces from a single audio file
+    #[command(after_help = "\
+Examples:
+  polez clean track.wav                         Clean with default settings
+  polez clean track.mp3 -o clean.mp3 --verify   Clean and verify effectiveness
+  polez clean track.wav --paranoid --backup      Maximum destruction with backup
+  polez clean track.wav --dry-run --report r.json  Analyze without cleaning
+  polez --json clean track.wav                   Machine-readable JSON output")]
     Clean {
         /// Input audio file path
         input_file: PathBuf,
@@ -76,6 +83,12 @@ pub enum Commands {
     },
 
     /// Sweep an entire directory of audio files
+    #[command(after_help = "\
+Examples:
+  polez sweep ./music                           Clean all audio files in directory
+  polez sweep ./music -d ./clean -w 8           Custom output dir, 8 workers
+  polez sweep ./music -r --paranoid --backup    Recursive paranoid mode with backups
+  polez sweep ./music -e mp3 -e wav --dry-run   Preview which files would be processed")]
     Sweep {
         /// Directory containing audio files
         directory: PathBuf,
@@ -113,6 +126,12 @@ pub enum Commands {
     },
 
     /// Detect watermarks and metadata in an audio file
+    #[command(after_help = "\
+Examples:
+  polez detect track.wav                        Quick watermark scan
+  polez detect track.mp3 --deep                 Deep analysis with statistical tests
+  polez detect track.wav --report analysis.json  Export detailed report to JSON
+  polez --json detect track.wav                  Pipe results to jq or scripts")]
     Detect {
         /// Input audio file path
         input_file: PathBuf,
@@ -127,6 +146,11 @@ pub enum Commands {
     },
 
     /// Batch scan directory and output CSV results for dataset analysis
+    #[command(after_help = "\
+Examples:
+  polez benchmark ./dataset                     Scan directory, output CSV
+  polez benchmark ./dataset -o results.csv -r   Recursive scan with custom output
+  polez benchmark ./dataset -e wav -e flac      Scan only WAV and FLAC files")]
     Benchmark {
         /// Directory containing audio files
         directory: PathBuf,
@@ -145,6 +169,11 @@ pub enum Commands {
     },
 
     /// Visualize high-frequency spectrogram to reveal watermarks
+    #[command(after_help = "\
+Examples:
+  polez inspect track.wav                       Show 15-24 kHz spectrogram
+  polez inspect track.wav --start 10 --duration 3  Inspect specific time range
+  polez inspect track.wav --freq-min 18000      Focus on ultrasonic range")]
     Inspect {
         /// Input audio file path
         input_file: PathBuf,
@@ -167,6 +196,11 @@ pub enum Commands {
     },
 
     /// View raw bit patterns to find embedded watermark data
+    #[command(after_help = "\
+Examples:
+  polez bits track.wav                          Analyze LSB plane (default)
+  polez bits track.wav -b 1 --search            Scan bit plane 1 for ASCII strings
+  polez bits track.wav --offset 5000 -c 20000   Analyze specific sample range")]
     Bits {
         /// Input audio file path
         input_file: PathBuf,
