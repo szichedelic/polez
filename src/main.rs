@@ -285,12 +285,14 @@ fn run_command(
         } => cmd_benchmark(&directory, &output, recursive, &extension, console),
         Commands::Inspect {
             input_file,
+            output,
             start,
             duration,
             freq_min,
             freq_max,
         } => cmd_inspect(
             &input_file,
+            output.as_deref(),
             start,
             duration,
             freq_min,
@@ -1102,8 +1104,10 @@ fn display_polez_results(result: &detection::PolezDetectionResult, _console: &Co
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_inspect(
     input_file: &Path,
+    output: Option<&Path>,
     start: f64,
     duration: f64,
     freq_min: u32,
@@ -1135,16 +1139,22 @@ fn cmd_inspect(
         return print_json(&result);
     }
 
-    console.info(&format!(
-        "Generating spectrogram view ({}-{} kHz, {:.1}s-{:.1}s)...",
-        freq_min / 1000,
-        freq_max / 1000,
-        start,
-        start + duration
-    ));
-
     let view = inspect::SpectrogramView::new(freq_min, freq_max, start, duration);
-    view.render(&audio_buf)?;
+
+    if let Some(svg_path) = output {
+        console.info(&format!("Exporting spectrogram to: {}", svg_path.display()));
+        view.export_svg(&audio_buf, svg_path)?;
+        console.success(&format!("SVG written to {}", svg_path.display()));
+    } else {
+        console.info(&format!(
+            "Generating spectrogram view ({}-{} kHz, {:.1}s-{:.1}s)...",
+            freq_min / 1000,
+            freq_max / 1000,
+            start,
+            start + duration
+        ));
+        view.render(&audio_buf)?;
+    }
 
     Ok(())
 }

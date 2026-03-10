@@ -3,6 +3,37 @@
 use crate::audio::AudioBuffer;
 use crate::error::Result;
 use colored::Colorize;
+use std::fmt::Write as FmtWrite;
+use std::path::Path;
+
+struct SpectrogramData {
+    spectrogram: Vec<Vec<f64>>,
+    min_db: f64,
+    max_db: f64,
+    sample_rate: f64,
+    window_size: usize,
+}
+
+fn intensity_to_rgb(normalized: f64) -> (u8, u8, u8) {
+    // Dark blue -> cyan -> green -> yellow -> red
+    let (r, g, b) = if normalized < 0.2 {
+        let t = normalized / 0.2;
+        (0.0, 0.0, 0.3 + 0.7 * t)
+    } else if normalized < 0.4 {
+        let t = (normalized - 0.2) / 0.2;
+        (0.0, t, 1.0)
+    } else if normalized < 0.6 {
+        let t = (normalized - 0.4) / 0.2;
+        (0.0, 1.0, 1.0 - t)
+    } else if normalized < 0.8 {
+        let t = (normalized - 0.6) / 0.2;
+        (t, 1.0, 0.0)
+    } else {
+        let t = (normalized - 0.8) / 0.2;
+        (1.0, 1.0 - t, 0.0)
+    };
+    ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+}
 
 /// Spectrogram visualization for high-frequency watermark detection.
 pub struct SpectrogramView {
@@ -22,12 +53,10 @@ impl SpectrogramView {
         }
     }
 
-    /// Render ASCII spectrogram to console.
-    pub fn render(&self, buffer: &AudioBuffer) -> Result<()> {
+    fn compute_spectrogram(&self, buffer: &AudioBuffer) -> Option<SpectrogramData> {
         let sample_rate = buffer.sample_rate as f64;
         let samples = buffer.to_mono_samples();
 
-        // Calculate sample range
         let start_sample = (self.start_secs * sample_rate) as usize;
         let duration_samples = if self.duration_secs > 0.0 {
             (self.duration_secs * sample_rate) as usize
@@ -35,20 +64,16 @@ impl SpectrogramView {
             samples.len() - start_sample
         };
         let end_sample = (start_sample + duration_samples).min(samples.len());
-
         let chunk = &samples[start_sample..end_sample];
 
-        // STFT parameters
         let window_size = 2048;
         let hop = 256;
         let n_windows = (chunk.len().saturating_sub(window_size)) / hop;
 
         if n_windows < 10 {
-            println!("{}", "Not enough audio data for spectrogram".red());
-            return Ok(());
+            return None;
         }
 
-        // Compute spectrogram
         let mut spectrogram: Vec<Vec<f64>> = Vec::new();
         let hann: Vec<f64> = (0..window_size)
             .map(|i| {
@@ -64,11 +89,9 @@ impl SpectrogramView {
                 .map(|(s, h)| *s as f64 * h)
                 .collect();
 
-            // Zero-pad to power of 2
             let fft_size = window_size;
             windowed.resize(fft_size, 0.0);
 
-            // Simple DFT for the frequency range we care about
             let freq_resolution = sample_rate / fft_size as f64;
             let bin_min = (self.freq_min as f64 / freq_resolution) as usize;
             let bin_max =
@@ -84,12 +107,11 @@ impl SpectrogramView {
                     im -= sample * angle.sin();
                 }
                 let magnitude = (re * re + im * im).sqrt();
-                spectrum.push(20.0 * (magnitude + 1e-10).log10()); // dB
+                spectrum.push(20.0 * (magnitude + 1e-10).log10());
             }
             spectrogram.push(spectrum);
         }
 
-        // Find min/max for normalization
         let mut min_db = f64::INFINITY;
         let mut max_db = f64::NEG_INFINITY;
         for row in &spectrogram {
@@ -100,6 +122,158 @@ impl SpectrogramView {
                 }
             }
         }
+
+        Some(SpectrogramData {
+            spectrogram,
+            min_db,
+            max_db,
+            sample_rate,
+            window_size,
+        })
+    }
+
+    /// Export spectrogram as SVG file.
+    pub fn export_svg(&self, buffer: &AudioBuffer, path: &Path) -> Result<()> {
+        let data = self.compute_spectrogram(buffer).ok_or_else(|| {
+            crate::error::PolezError::Dsp("Not enough audio data for spectrogram".into())
+        })?;
+
+        let margin_left = 70.0_f64;
+        let margin_top = 30.0_f64;
+        let margin_right = 20.0_f64;
+        let margin_bottom = 50.0_f64;
+        let plot_width = 800.0_f64;
+        let plot_height = 400.0_f64;
+        let total_width = margin_left + plot_width + margin_right;
+        let total_height = margin_top + plot_height + margin_bottom;
+
+        let freq_bins = data.spectrogram.first().map(|r| r.len()).unwrap_or(1);
+        let time_bins = data.spectrogram.len();
+        let cell_w = plot_width / time_bins as f64;
+        let cell_h = plot_height / freq_bins as f64;
+
+        let mut svg = String::with_capacity(1024 * 64);
+
+        let _ = writeln!(
+            svg,
+            r##"<svg xmlns="http://www.w3.org/2000/svg" width="{total_width}" height="{total_height}" viewBox="0 0 {total_width} {total_height}">"##
+        );
+        let _ = writeln!(
+            svg,
+            r##"<rect width="{total_width}" height="{total_height}" fill="#1a1a2e"/>"##
+        );
+        let _ = writeln!(
+            svg,
+            r##"<text x="{:.0}" y="20" fill="#e0e0e0" font-family="monospace" font-size="14" text-anchor="middle">Spectrogram: {}-{} kHz ({:.1}s - {:.1}s)</text>"##,
+            total_width / 2.0,
+            self.freq_min / 1000,
+            self.freq_max / 1000,
+            self.start_secs,
+            self.start_secs + self.duration_secs
+        );
+
+        for (ti, spectrum) in data.spectrogram.iter().enumerate() {
+            for (fi, &val) in spectrum.iter().enumerate() {
+                let normalized =
+                    ((val - data.min_db) / (data.max_db - data.min_db + 1e-10)).clamp(0.0, 1.0);
+                let (r, g, b) = intensity_to_rgb(normalized);
+                let x = margin_left + ti as f64 * cell_w;
+                let y = margin_top + plot_height - (fi + 1) as f64 * cell_h;
+                let _ = write!(
+                    svg,
+                    r##"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="rgb({},{},{})"/>"##,
+                    x,
+                    y,
+                    cell_w.ceil(),
+                    cell_h.ceil(),
+                    r,
+                    g,
+                    b
+                );
+            }
+        }
+
+        // Frequency axis labels
+        let num_freq_labels: usize = 6;
+        for i in 0..=num_freq_labels {
+            let freq = self.freq_min as f64
+                + (i as f64 / num_freq_labels as f64) * (self.freq_max - self.freq_min) as f64;
+            let y = margin_top + plot_height - (i as f64 / num_freq_labels as f64) * plot_height;
+            let _ = write!(
+                svg,
+                r##"<text x="{:.0}" y="{:.0}" fill="#e0e0e0" font-family="monospace" font-size="11" text-anchor="end">{:.1}k</text>"##,
+                margin_left - 5.0,
+                y + 4.0,
+                freq / 1000.0
+            );
+            let _ = write!(
+                svg,
+                r##"<line x1="{}" y1="{:.0}" x2="{:.0}" y2="{:.0}" stroke="#444" stroke-width="0.5"/>"##,
+                margin_left,
+                y,
+                margin_left + plot_width,
+                y
+            );
+        }
+
+        // Time axis labels
+        let num_time_labels: usize = 8;
+        let time_range = self.duration_secs;
+        for i in 0..=num_time_labels {
+            let t = self.start_secs + (i as f64 / num_time_labels as f64) * time_range;
+            let x = margin_left + (i as f64 / num_time_labels as f64) * plot_width;
+            let _ = write!(
+                svg,
+                r##"<text x="{:.0}" y="{:.0}" fill="#e0e0e0" font-family="monospace" font-size="11" text-anchor="middle">{:.2}s</text>"##,
+                x,
+                margin_top + plot_height + 20.0,
+                t
+            );
+        }
+
+        // Axis labels
+        let freq_label_y = margin_top + plot_height / 2.0;
+        let _ = write!(
+            svg,
+            r##"<text x="15" y="{freq_label_y:.0}" fill="#e0e0e0" font-family="monospace" font-size="12" text-anchor="middle" transform="rotate(-90,15,{freq_label_y:.0})">Frequency (kHz)</text>"##
+        );
+        let _ = write!(
+            svg,
+            r##"<text x="{:.0}" y="{:.0}" fill="#e0e0e0" font-family="monospace" font-size="12" text-anchor="middle">Time (s)</text>"##,
+            margin_left + plot_width / 2.0,
+            margin_top + plot_height + 42.0
+        );
+
+        // Plot border
+        let _ = write!(
+            svg,
+            r##"<rect x="{margin_left}" y="{margin_top}" width="{plot_width}" height="{plot_height}" fill="none" stroke="#666" stroke-width="1"/>"##
+        );
+
+        svg.push_str("</svg>");
+
+        std::fs::write(path, &svg)?;
+
+        Ok(())
+    }
+
+    /// Render ASCII spectrogram to console.
+    pub fn render(&self, buffer: &AudioBuffer) -> Result<()> {
+        let data = match self.compute_spectrogram(buffer) {
+            Some(d) => d,
+            None => {
+                println!("{}", "Not enough audio data for spectrogram".red());
+                return Ok(());
+            }
+        };
+
+        let SpectrogramData {
+            ref spectrogram,
+            min_db,
+            max_db,
+            sample_rate,
+            window_size,
+        } = data;
 
         // Render ASCII
         let display_rows = 24;
@@ -202,9 +376,9 @@ impl SpectrogramView {
 
                 let mut sum = 0.0;
                 let mut count = 0;
-                for row in &spectrogram {
+                for row in spectrogram {
                     for val in row.iter().take(bin_high.min(row.len())).skip(bin_low) {
-                        sum += 10_f64.powf(val / 20.0); // Convert from dB
+                        sum += 10_f64.powf(val / 20.0);
                         count += 1;
                     }
                 }

@@ -180,10 +180,15 @@ Examples:
 Examples:
   polez inspect track.wav                       Show 15-24 kHz spectrogram
   polez inspect track.wav --start 10 --duration 3  Inspect specific time range
-  polez inspect track.wav --freq-min 18000      Focus on ultrasonic range")]
+  polez inspect track.wav --freq-min 18000      Focus on ultrasonic range
+  polez inspect track.wav -o spectrogram.svg    Export spectrogram as SVG file")]
     Inspect {
         /// Input audio file path
         input_file: PathBuf,
+
+        /// Export spectrogram to SVG file instead of console
+        #[arg(short, long)]
+        output: Option<PathBuf>,
 
         /// Start time in seconds
         #[arg(long, default_value = "0")]
