@@ -8,6 +8,7 @@ pub struct ConfigManager {
     config_dir: PathBuf,
     config_file: PathBuf,
     pub config: AppConfig,
+    pub env_overrides: Vec<String>,
 }
 
 impl ConfigManager {
@@ -18,8 +19,10 @@ impl ConfigManager {
             config_dir,
             config_file,
             config: default_config(),
+            env_overrides: Vec::new(),
         };
         mgr.load()?;
+        mgr.apply_env_overrides();
         Ok(mgr)
     }
 
@@ -39,6 +42,98 @@ impl ConfigManager {
             self.save()?;
         }
         Ok(())
+    }
+
+    /// Apply environment variable overrides to the loaded config.
+    /// Env vars override config file values but are overridden by CLI flags.
+    fn apply_env_overrides(&mut self) {
+        use crate::config::types::{OutputFormat, ParanoiaLevel, QualityLevel};
+
+        if let Ok(val) = std::env::var("POLEZ_MODE") {
+            match val.to_lowercase().as_str() {
+                "fast" => {
+                    self.config.paranoia_level = ParanoiaLevel::Low;
+                    self.env_overrides
+                        .push(format!("POLEZ_MODE={val} → paranoia_level=low"));
+                }
+                "standard" => {
+                    self.config.paranoia_level = ParanoiaLevel::Medium;
+                    self.env_overrides
+                        .push(format!("POLEZ_MODE={val} → paranoia_level=medium"));
+                }
+                "preserving" => {
+                    self.config.paranoia_level = ParanoiaLevel::High;
+                    self.env_overrides
+                        .push(format!("POLEZ_MODE={val} → paranoia_level=high"));
+                }
+                "aggressive" => {
+                    self.config.paranoia_level = ParanoiaLevel::Maximum;
+                    self.env_overrides
+                        .push(format!("POLEZ_MODE={val} → paranoia_level=maximum"));
+                }
+                _ => tracing::warn!("Unknown POLEZ_MODE value: {val}"),
+            }
+        }
+
+        if let Ok(val) = std::env::var("POLEZ_QUALITY") {
+            match val.to_lowercase().as_str() {
+                "low" => {
+                    self.config.preserve_quality = QualityLevel::Low;
+                    self.env_overrides
+                        .push(format!("POLEZ_QUALITY={val} → preserve_quality=low"));
+                }
+                "medium" => {
+                    self.config.preserve_quality = QualityLevel::Medium;
+                    self.env_overrides
+                        .push(format!("POLEZ_QUALITY={val} → preserve_quality=medium"));
+                }
+                "high" => {
+                    self.config.preserve_quality = QualityLevel::High;
+                    self.env_overrides
+                        .push(format!("POLEZ_QUALITY={val} → preserve_quality=high"));
+                }
+                "maximum" => {
+                    self.config.preserve_quality = QualityLevel::Maximum;
+                    self.env_overrides
+                        .push(format!("POLEZ_QUALITY={val} → preserve_quality=maximum"));
+                }
+                _ => tracing::warn!("Unknown POLEZ_QUALITY value: {val}"),
+            }
+        }
+
+        if let Ok(val) = std::env::var("POLEZ_OUTPUT_FORMAT") {
+            match val.to_lowercase().as_str() {
+                "preserve" => {
+                    self.config.output_format = OutputFormat::Preserve;
+                    self.env_overrides.push(format!(
+                        "POLEZ_OUTPUT_FORMAT={val} → output_format=preserve"
+                    ));
+                }
+                "mp3" => {
+                    self.config.output_format = OutputFormat::Mp3;
+                    self.env_overrides
+                        .push(format!("POLEZ_OUTPUT_FORMAT={val} → output_format=mp3"));
+                }
+                "wav" => {
+                    self.config.output_format = OutputFormat::Wav;
+                    self.env_overrides
+                        .push(format!("POLEZ_OUTPUT_FORMAT={val} → output_format=wav"));
+                }
+                _ => tracing::warn!("Unknown POLEZ_OUTPUT_FORMAT value: {val}"),
+            }
+        }
+
+        if let Ok(val) = std::env::var("POLEZ_PARANOID") {
+            match val.to_lowercase().as_str() {
+                "1" | "true" | "yes" => {
+                    self.config.paranoia_level = ParanoiaLevel::Maximum;
+                    self.env_overrides
+                        .push(format!("POLEZ_PARANOID={val} → paranoia_level=maximum"));
+                }
+                "0" | "false" | "no" => {}
+                _ => tracing::warn!("Unknown POLEZ_PARANOID value: {val}"),
+            }
+        }
     }
 
     pub fn save(&self) -> Result<()> {

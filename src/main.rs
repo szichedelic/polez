@@ -1388,6 +1388,14 @@ fn cmd_config(action: Option<ConfigAction>, console: &ConsoleManager) -> error::
             let yaml = serde_yaml::to_string(&config_mgr.config)
                 .map_err(|e| error::PolezError::Config(format!("Serialize error: {e}")))?;
 
+            if !config_mgr.env_overrides.is_empty() {
+                console.warning("Active environment variable overrides:");
+                for ov in &config_mgr.env_overrides {
+                    console.info(&format!("  {ov}"));
+                }
+                println!();
+            }
+
             console.info("Current Configuration:");
             println!("{yaml}");
             Ok(())
