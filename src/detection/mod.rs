@@ -125,4 +125,94 @@ mod tests {
         let _ = StatisticalAnalyzer::analyze(&stereo);
         let _ = PolezDetector::detect(&stereo);
     }
+
+    /// Create audio with a synthetic spread-spectrum watermark (low-level noise across full band).
+    fn watermarked_spread_spectrum(sr: u32, duration: f32) -> AudioBuffer {
+        use rand::Rng;
+        let n = (sr as f32 * duration) as usize;
+        let mut rng = rand::thread_rng();
+        let mut data: Vec<f32> = (0..n)
+            .map(|i| {
+                let t = i as f32 / sr as f32;
+                0.5 * (2.0 * PI * 440.0 * t).sin()
+            })
+            .collect();
+        // Add spread-spectrum watermark: correlated noise at specific intervals
+        let chip_len = 256;
+        let pattern: Vec<f32> = (0..chip_len).map(|_| rng.gen_range(-0.02..0.02)).collect();
+        for chunk in data.chunks_exact_mut(chip_len) {
+            for (s, &p) in chunk.iter_mut().zip(pattern.iter()) {
+                *s += p;
+            }
+        }
+        AudioBuffer::from_mono(data, sr)
+    }
+
+    #[test]
+    fn test_spread_spectrum_detected() {
+        let buf = watermarked_spread_spectrum(44100, 2.0);
+        let result = WatermarkDetector::detect_all(&buf);
+        // A spread-spectrum watermark should trigger at least one detection method
+        assert!(
+            result.watermark_count > 0 || result.overall_confidence > 0.1,
+            "Spread-spectrum watermark should be detected: count={}, confidence={}",
+            result.watermark_count,
+            result.overall_confidence
+        );
+    }
+
+    /// Create audio with embedded LSB steganography pattern.
+    fn watermarked_lsb_stego(sr: u32, duration: f32) -> AudioBuffer {
+        let n = (sr as f32 * duration) as usize;
+        let mut data: Vec<f32> = (0..n)
+            .map(|i| {
+                let t = i as f32 / sr as f32;
+                0.5 * (2.0 * PI * 440.0 * t).sin()
+            })
+            .collect();
+        // Embed alternating 0/1 pattern in LSBs (non-random = detectable)
+        for (i, s) in data.iter_mut().enumerate() {
+            let as_i16 = (*s * 32767.0) as i16;
+            let modified = if i % 2 == 0 { as_i16 | 1 } else { as_i16 & !1 };
+            *s = modified as f32 / 32767.0;
+        }
+        AudioBuffer::from_mono(data, sr)
+    }
+
+    #[test]
+    fn test_lsb_stego_detected() {
+        let buf = watermarked_lsb_stego(44100, 2.0);
+        let result = WatermarkDetector::detect_all(&buf);
+        let lsb_method = result.method_results.get("lsb_steganography");
+        assert!(
+            lsb_method.is_some_and(|m| m.detected || m.confidence > 0.1),
+            "LSB steganography pattern should be detected"
+        );
+    }
+
+    /// Create audio with ultrasonic energy (watermark in 20-22 kHz range).
+    fn watermarked_ultrasonic(sr: u32, duration: f32) -> AudioBuffer {
+        let n = (sr as f32 * duration) as usize;
+        let data: Vec<f32> = (0..n)
+            .map(|i| {
+                let t = i as f32 / sr as f32;
+                0.5 * (2.0 * PI * 440.0 * t).sin()
+                    + 0.03 * (2.0 * PI * 21000.0 * t).sin()
+                    + 0.03 * (2.0 * PI * 21500.0 * t).sin()
+            })
+            .collect();
+        AudioBuffer::from_mono(data, sr)
+    }
+
+    #[test]
+    fn test_ultrasonic_watermark_detected() {
+        // Use 48kHz to ensure ultrasonic bands are representable
+        let buf = watermarked_ultrasonic(48000, 2.0);
+        let result = PolezDetector::detect(&buf);
+        assert!(
+            result.signals.ultrasonic_ratio > 0.01,
+            "Ultrasonic energy should be detected: ratio={}",
+            result.signals.ultrasonic_ratio
+        );
+    }
 }
