@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use rayon::prelude::*;
+
 use crate::audio::{self, AudioBuffer, AudioFormat};
 use crate::config::{AdvancedFlags, AppConfig, FingerprintRemovalConfig};
 use crate::error::Result;
@@ -130,16 +132,18 @@ impl SanitizationPipeline {
             0.0
         };
 
-        // Resample if a target sample rate was specified
+        // Resample if a target sample rate was specified (channels in parallel)
         if let Some(target_sr) = self.target_sample_rate {
             if target_sr != buffer.sample_rate {
                 use super::dsp::resample;
-                let mut new_channels = Vec::with_capacity(buffer.num_channels());
-                for ch in 0..buffer.num_channels() {
-                    let ch_data: Vec<f32> = buffer.channel(ch).to_vec();
-                    let resampled = resample::resample(&ch_data, buffer.sample_rate, target_sr);
-                    new_channels.push(resampled);
-                }
+                let sr_in = buffer.sample_rate;
+                let new_channels: Vec<Vec<f32>> = (0..buffer.num_channels())
+                    .into_par_iter()
+                    .map(|ch| {
+                        let ch_data: Vec<f32> = buffer.channel(ch).to_vec();
+                        resample::resample(&ch_data, sr_in, target_sr)
+                    })
+                    .collect();
                 buffer = AudioBuffer::from_channels(new_channels, target_sr);
             }
         }
@@ -190,22 +194,32 @@ impl SanitizationPipeline {
         Ok((patterns_found, patterns_suppressed))
     }
 
-    /// Process a large buffer in overlapping chunks to limit memory usage.
+    /// Process a large buffer in overlapping chunks, parallelized with rayon.
     fn process_chunked(&self, buffer: AudioBuffer) -> Result<(AudioBuffer, usize, usize)> {
         let chunks = buffer.split_chunks(Self::CHUNK_SIZE, Self::OVERLAP);
         let num_chunks = chunks.len();
-        tracing::info!(chunks = num_chunks, "Processing in chunks");
+        tracing::info!(chunks = num_chunks, "Processing in chunks (parallel)");
 
         // Drop original buffer to free memory before processing chunks
         drop(buffer);
+
+        // Process all chunks in parallel
+        let results: Vec<Result<(AudioBuffer, usize, usize)>> = chunks
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, mut chunk)| {
+                tracing::debug!(chunk = i + 1, total = num_chunks, "Processing chunk");
+                let (found, suppressed) = self.process_buffer(&mut chunk)?;
+                Ok((chunk, found, suppressed))
+            })
+            .collect();
 
         let mut total_found = 0usize;
         let mut total_suppressed = 0usize;
         let mut processed_chunks = Vec::with_capacity(num_chunks);
 
-        for (i, mut chunk) in chunks.into_iter().enumerate() {
-            tracing::debug!(chunk = i + 1, total = num_chunks, "Processing chunk");
-            let (found, suppressed) = self.process_buffer(&mut chunk)?;
+        for r in results {
+            let (chunk, found, suppressed) = r?;
             total_found += found;
             total_suppressed += suppressed;
             processed_chunks.push(chunk);

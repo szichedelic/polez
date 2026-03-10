@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::audio::AudioBuffer;
@@ -78,31 +79,60 @@ impl WatermarkDetector {
             ("codec_artifacts", detect_codec_artifacts),
         ];
 
-        for (name, method) in &methods {
-            if let Some(filter) = filter {
-                if !filter.iter().any(|f| f == name) {
-                    continue;
-                }
-            }
-            let mr = method(&channel, sr);
+        // Filter methods first, then run in parallel
+        let active_methods: Vec<_> = methods
+            .into_iter()
+            .filter(|(name, _)| match filter {
+                Some(f) => f.iter().any(|flt| flt == name),
+                None => true,
+            })
+            .collect();
+
+        let mono_results: Vec<(String, MethodResult)> = active_methods
+            .par_iter()
+            .map(|(name, method)| (name.to_string(), method(&channel, sr)))
+            .collect();
+
+        for (name, mr) in mono_results {
             if mr.detected {
                 result.detected.push(WatermarkDetection {
-                    method: name.to_string(),
+                    method: name.clone(),
                     confidence: mr.confidence,
                     description: mr.details.first().cloned().unwrap_or_default(),
                 });
                 result.watermark_count += 1;
             }
-            result.method_results.insert(name.to_string(), mr);
+            result.method_results.insert(name, mr);
         }
 
-        // Phase coherence needs the full buffer (stereo analysis)
+        // Phase coherence and spatial encoding need the full buffer — run in parallel
         let run_phase_coherence = match filter {
             Some(f) => f.iter().any(|name| name == "phase_coherence"),
             None => true,
         };
-        if run_phase_coherence {
-            let mr = detect_phase_coherence(buffer);
+        let run_spatial = match filter {
+            Some(f) => f.iter().any(|name| name == "spatial_encoding"),
+            None => true,
+        };
+
+        let (phase_mr, spatial_mr) = rayon::join(
+            || {
+                if run_phase_coherence {
+                    Some(detect_phase_coherence(buffer))
+                } else {
+                    None
+                }
+            },
+            || {
+                if run_spatial {
+                    Some(detect_spatial_encoding(buffer))
+                } else {
+                    None
+                }
+            },
+        );
+
+        if let Some(mr) = phase_mr {
             if mr.detected {
                 result.detected.push(WatermarkDetection {
                     method: "phase_coherence".to_string(),
@@ -116,13 +146,7 @@ impl WatermarkDetector {
                 .insert("phase_coherence".to_string(), mr);
         }
 
-        // Spatial encoding also needs the full buffer (multi-channel analysis)
-        let run_spatial = match filter {
-            Some(f) => f.iter().any(|name| name == "spatial_encoding"),
-            None => true,
-        };
-        if run_spatial {
-            let mr = detect_spatial_encoding(buffer);
+        if let Some(mr) = spatial_mr {
             if mr.detected {
                 result.detected.push(WatermarkDetection {
                     method: "spatial_encoding".to_string(),
