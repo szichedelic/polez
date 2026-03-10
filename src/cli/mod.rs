@@ -52,6 +52,10 @@ pub enum Commands {
         #[arg(long)]
         report: Option<PathBuf>,
 
+        /// Append audit log entry (JSON lines) — logs hashes, mode, flags (no file paths)
+        #[arg(long)]
+        audit_log: Option<PathBuf>,
+
         #[command(flatten)]
         flags: AdvancedFlagsCli,
 

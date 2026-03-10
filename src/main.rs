@@ -18,6 +18,7 @@ use std::time::Instant;
 
 use clap::Parser;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 
 use cli::{Cli, Commands, ConfigAction, FormatChoice};
 use config::ConfigManager;
@@ -63,6 +64,98 @@ fn write_json_report(report: &JsonReport, path: &Path) -> error::Result<()> {
     Ok(())
 }
 
+#[derive(Serialize)]
+struct AuditEntry {
+    timestamp: String,
+    input_hash: String,
+    output_hash: String,
+    mode: String,
+    paranoid: bool,
+    flags: config::AdvancedFlags,
+    metadata_removed: usize,
+    patterns_found: usize,
+    patterns_suppressed: usize,
+    quality_loss: f64,
+    processing_time: f64,
+    success: bool,
+}
+
+fn file_sha256(path: &Path) -> error::Result<String> {
+    let data = std::fs::read(path)?;
+    let mut hasher = Sha256::new();
+    hasher.update(&data);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn write_audit_entry(entry: &AuditEntry, path: &Path) -> error::Result<()> {
+    use std::io::Write;
+    let json = serde_json::to_string(entry)
+        .map_err(|e| error::PolezError::Other(anyhow::anyhow!("Audit serialization error: {e}")))?;
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)?;
+    writeln!(file, "{json}")?;
+    Ok(())
+}
+
+fn unix_timestamp_iso8601() -> String {
+    use std::time::SystemTime;
+    let duration = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = duration.as_secs();
+    let days = secs / 86400;
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    // Simple epoch-to-date conversion
+    let mut y = 1970i64;
+    let mut remaining_days = days as i64;
+    loop {
+        let days_in_year = if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) {
+            366
+        } else {
+            365
+        };
+        if remaining_days < days_in_year {
+            break;
+        }
+        remaining_days -= days_in_year;
+        y += 1;
+    }
+    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let month_days = [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+    let mut m = 0;
+    for &md in &month_days {
+        if remaining_days < md {
+            break;
+        }
+        remaining_days -= md;
+        m += 1;
+    }
+    format!(
+        "{y:04}-{:02}-{:02}T{hours:02}:{minutes:02}:{seconds:02}Z",
+        m + 1,
+        remaining_days + 1
+    )
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -103,6 +196,7 @@ fn run_command(
             dry_run,
             format,
             report,
+            audit_log,
             flags,
             fp_flags,
         } => cmd_clean(
@@ -113,6 +207,7 @@ fn run_command(
             backup,
             dry_run,
             report.as_deref(),
+            audit_log.as_deref(),
             format,
             flags.into(),
             fp_flags.into(),
@@ -189,6 +284,7 @@ fn cmd_gui(port: u16, no_open: bool, console: &ConsoleManager) -> error::Result<
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn cmd_clean(
     input_file: &Path,
     output: Option<&Path>,
@@ -197,6 +293,7 @@ fn cmd_clean(
     backup: bool,
     dry_run: bool,
     report: Option<&Path>,
+    audit_log: Option<&Path>,
     format: FormatChoice,
     flags: config::AdvancedFlags,
     fp_config: config::FingerprintRemovalConfig,
@@ -304,6 +401,7 @@ fn cmd_clean(
     }
 
     let mode = SanitizationPipeline::mode_from_config(&config_mgr.config);
+    let audit_flags = flags.clone();
     let pipeline = SanitizationPipeline::new(mode, paranoid, flags, fp_config, out_format);
 
     banner.show_processing_banner();
@@ -364,6 +462,30 @@ fn cmd_clean(
         };
         write_json_report(&json_report, report_path)?;
         console.success(&format!("Report saved to: {}", report_path.display()));
+    }
+
+    if let Some(audit_path) = audit_log {
+        let input_hash = file_sha256(input_file).unwrap_or_else(|_| "hash_error".to_string());
+        let output_hash = file_sha256(&output_path).unwrap_or_else(|_| "hash_error".to_string());
+        let entry = AuditEntry {
+            timestamp: unix_timestamp_iso8601(),
+            input_hash,
+            output_hash,
+            mode: format!("{mode:?}"),
+            paranoid,
+            flags: audit_flags.clone(),
+            metadata_removed: result.metadata_removed,
+            patterns_found: result.patterns_found,
+            patterns_suppressed: result.patterns_suppressed,
+            quality_loss: result.quality_loss,
+            processing_time: result.processing_time,
+            success: result.success,
+        };
+        write_audit_entry(&entry, audit_path)?;
+        console.info(&format!(
+            "Audit entry appended to: {}",
+            audit_path.display()
+        ));
     }
 
     if result.success {
