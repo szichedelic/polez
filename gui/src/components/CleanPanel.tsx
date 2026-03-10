@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { cleanFile, saveCleanedFile } from '../api/client';
-import type { CleanResponse } from '../api/client';
+import type { CleanResponse, VerificationResult as VerResult } from '../api/client';
 
 interface Props {
   fileLoaded: boolean;
@@ -43,6 +43,53 @@ function DetectionColumn({ title, data }: { title: string; data: any }) {
           Metadata: {data.metadata.tags.length} tags, {data.metadata.suspicious_chunks.length} suspicious
         </div>
       )}
+    </div>
+  );
+}
+
+const GRADE_COLORS: Record<string, string> = {
+  A: 'text-green-400 border-green-500',
+  B: 'text-emerald-400 border-emerald-500',
+  C: 'text-yellow-400 border-yellow-500',
+  D: 'text-orange-400 border-orange-500',
+  F: 'text-red-400 border-red-500',
+};
+
+function VerificationPanel({ verification: v }: { verification: VerResult }) {
+  const gradeStyle = GRADE_COLORS[v.grade] || 'text-zinc-400 border-zinc-500';
+  const snrDisplay = isFinite(v.snr_db) ? `${v.snr_db.toFixed(1)} dB` : 'Infinite';
+
+  return (
+    <div className="bg-zinc-800 border border-zinc-700 rounded p-3 mb-3">
+      <div className="flex items-center gap-4 mb-3">
+        <div className={`text-3xl font-bold border-2 rounded-lg w-12 h-12 flex items-center justify-center ${gradeStyle}`}>
+          {v.grade}
+        </div>
+        <div>
+          <div className="text-sm font-medium text-zinc-200">Quality Grade</div>
+          <div className={`text-xs ${v.verdict_color === 'green' ? 'text-green-400' : v.verdict_color === 'yellow' ? 'text-yellow-400' : 'text-red-400'}`}>
+            {v.verdict}
+          </div>
+        </div>
+        <div className="ml-auto text-right">
+          <div className="text-sm text-zinc-400">Threats</div>
+          <div className="text-sm text-zinc-200">{v.original_threats} &rarr; {v.remaining_threats}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <div className="text-xs text-zinc-500 mb-1">SNR</div>
+          <div className="text-sm text-zinc-200">{snrDisplay}</div>
+        </div>
+        <div>
+          <div className="text-xs text-zinc-500 mb-1">Spectral Similarity</div>
+          <div className="text-sm text-zinc-200">{(v.spectral_similarity * 100).toFixed(1)}%</div>
+        </div>
+        <div>
+          <div className="text-xs text-zinc-500 mb-1">Effectiveness</div>
+          <div className="text-sm text-zinc-200">{v.removal_effectiveness.toFixed(1)}%</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -134,6 +181,8 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
             <span>Metadata removed: {result.metadata_removed}</span>
             <span>Patterns: {result.patterns_found} found, {result.patterns_suppressed} suppressed</span>
           </div>
+
+          <VerificationPanel verification={result.verification} />
 
           <div className="flex gap-4">
             <DetectionColumn title="Before" data={result.before} />

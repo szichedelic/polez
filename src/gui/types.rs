@@ -60,6 +60,19 @@ pub struct CleanRequest {
 }
 
 #[derive(Serialize)]
+pub struct VerificationResult {
+    pub original_threats: usize,
+    pub remaining_threats: usize,
+    pub removal_effectiveness: f64,
+    pub snr_db: f64,
+    pub spectral_similarity: f64,
+    pub quality_score: f64,
+    pub grade: String,
+    pub verdict: String,
+    pub verdict_color: String,
+}
+
+#[derive(Serialize)]
 pub struct CleanResponse {
     pub success: bool,
     pub metadata_removed: usize,
@@ -69,4 +82,5 @@ pub struct CleanResponse {
     pub processing_time: f64,
     pub before: AllAnalysisResult,
     pub after: AllAnalysisResult,
+    pub verification: VerificationResult,
 }

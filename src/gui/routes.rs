@@ -17,10 +17,11 @@ use crate::config::{defaults::default_config, AdvancedFlags};
 use crate::detection::{MetadataScanner, PolezDetector, StatisticalAnalyzer, WatermarkDetector};
 use crate::sanitization::pipeline::SanitizationMode;
 use crate::sanitization::SanitizationPipeline;
+use crate::verification;
 
 use super::types::{
     AllAnalysisResult, BitPlaneData, CleanRequest, CleanResponse, FileInfo, PlaneSummary,
-    SpectrogramData, WaveformData,
+    SpectrogramData, VerificationResult, WaveformData,
 };
 use super::SharedState;
 
@@ -686,6 +687,48 @@ async fn clean_file(
         metadata,
     };
 
+    // Compute verification metrics
+    let orig_path = std::path::PathBuf::from(&file_path);
+    let ver_output = output_path.clone();
+    let ver_result =
+        tokio::task::spawn_blocking(move || verification::verify(&orig_path, &ver_output))
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Verification task error: {e}"),
+                )
+            })?
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Verification error: {e}"),
+                )
+            })?;
+
+    let (verdict_text, verdict_color) =
+        verification::verdict(ver_result.removal_effectiveness, ver_result.snr_db);
+
+    let grade = match (ver_result.quality_score * 100.0) as u32 {
+        90..=100 => "A",
+        80..=89 => "B",
+        70..=79 => "C",
+        60..=69 => "D",
+        _ => "F",
+    };
+
+    let verification = VerificationResult {
+        original_threats: ver_result.original_threats,
+        remaining_threats: ver_result.remaining_threats,
+        removal_effectiveness: ver_result.removal_effectiveness,
+        snr_db: ver_result.snr_db,
+        spectral_similarity: ver_result.spectral_similarity,
+        quality_score: ver_result.quality_score,
+        grade: grade.to_string(),
+        verdict: verdict_text.to_string(),
+        verdict_color: verdict_color.to_string(),
+    };
+
     // Store cleaned state and track temp file for cleanup
     {
         let mut s = state.write().await;
@@ -704,6 +747,7 @@ async fn clean_file(
         processing_time: san_result.processing_time,
         before,
         after,
+        verification,
     }))
 }
 

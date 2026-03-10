@@ -159,6 +159,18 @@ export function getAudioUrl(): string {
   return `${BASE}/api/audio`;
 }
 
+export interface VerificationResult {
+  original_threats: number;
+  remaining_threats: number;
+  removal_effectiveness: number;
+  snr_db: number;
+  spectral_similarity: number;
+  quality_score: number;
+  grade: string;
+  verdict: string;
+  verdict_color: string;
+}
+
 export interface CleanResponse {
   success: boolean;
   metadata_removed: number;
@@ -168,6 +180,7 @@ export interface CleanResponse {
   processing_time: number;
   before: any;
   after: any;
+  verification: VerificationResult;
 }
 
 export async function cleanFile(mode?: string): Promise<CleanResponse> {
