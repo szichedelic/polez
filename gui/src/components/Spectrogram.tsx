@@ -1,30 +1,53 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { getSpectrogram, type SpectrogramData } from '../api/client';
 
 interface Props {
   fileLoaded: boolean;
 }
 
+interface ViewRange {
+  freqMin: number;
+  freqMax: number;
+  timeStart: number;
+  duration: number;
+}
+
+const DEFAULT_VIEW: ViewRange = {
+  freqMin: 0,
+  freqMax: 24000,
+  timeStart: 0,
+  duration: 0, // 0 means full duration
+};
+
 export function Spectrogram({ fileLoaded }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<SpectrogramData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [freqMax, setFreqMax] = useState(24000);
+  const [view, setView] = useState<ViewRange>(DEFAULT_VIEW);
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<{ x: number; y: number; view: ViewRange } | null>(null);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!fileLoaded) return;
-    fetchSpectrogram();
-  }, [fileLoaded, freqMax]);
-
-  const fetchSpectrogram = async () => {
     setLoading(true);
     try {
-      const d = await getSpectrogram({ freq_max: freqMax });
+      const opts: Parameters<typeof getSpectrogram>[0] = {
+        freq_min: view.freqMin,
+        freq_max: view.freqMax,
+      };
+      if (view.timeStart > 0) opts.start = view.timeStart;
+      if (view.duration > 0) opts.duration = view.duration;
+      const d = await getSpectrogram(opts);
       setData(d);
     } finally {
       setLoading(false);
     }
-  };
+  }, [fileLoaded, view]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   useEffect(() => {
     if (!data || !canvasRef.current) return;
@@ -67,34 +90,119 @@ export function Spectrogram({ fileLoaded }: Props) {
     ctx.putImageData(imageData, 0, 0);
   }, [data]);
 
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    if (!data) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const xFrac = (e.clientX - rect.left) / rect.width;
+    const yFrac = 1 - (e.clientY - rect.top) / rect.height;
+
+    const zoomFactor = e.deltaY > 0 ? 1.2 : 0.8;
+
+    setView(prev => {
+      const freqRange = prev.freqMax - prev.freqMin;
+      const timeRange = prev.duration > 0 ? prev.duration : (data.time_end - data.time_start);
+
+      const newFreqRange = Math.max(500, Math.min(24000, freqRange * zoomFactor));
+      const newTimeRange = Math.max(0.5, timeRange * zoomFactor);
+
+      const freqCenter = prev.freqMin + freqRange * yFrac;
+      const timeCenter = prev.timeStart + timeRange * xFrac;
+
+      const newFreqMin = Math.max(0, freqCenter - newFreqRange * yFrac);
+      const newFreqMax = Math.min(24000, newFreqMin + newFreqRange);
+      const newTimeStart = Math.max(0, timeCenter - newTimeRange * xFrac);
+
+      return {
+        freqMin: Math.round(newFreqMin),
+        freqMax: Math.round(newFreqMax),
+        timeStart: Math.round(newTimeStart * 100) / 100,
+        duration: Math.round(newTimeRange * 100) / 100,
+      };
+    });
+  }, [data]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    setDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY, view: { ...view } };
+  }, [view]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragging || !dragStart.current || !canvasRef.current || !data) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const dx = (e.clientX - dragStart.current.x) / rect.width;
+    const dy = (e.clientY - dragStart.current.y) / rect.height;
+
+    const sv = dragStart.current.view;
+    const freqRange = sv.freqMax - sv.freqMin;
+    const timeRange = sv.duration > 0 ? sv.duration : (data.time_end - data.time_start);
+
+    const newTimeStart = Math.max(0, sv.timeStart - dx * timeRange);
+    const newFreqMin = Math.max(0, sv.freqMin + dy * freqRange);
+    const newFreqMax = Math.min(24000, newFreqMin + freqRange);
+
+    setView({
+      freqMin: Math.round(newFreqMin),
+      freqMax: Math.round(newFreqMax),
+      timeStart: Math.round(newTimeStart * 100) / 100,
+      duration: sv.duration,
+    });
+  }, [dragging, data]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragging(false);
+    dragStart.current = null;
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    setView(DEFAULT_VIEW);
+  }, []);
+
+  const isZoomed = view.freqMin !== 0 || view.freqMax !== 24000 || view.timeStart !== 0 || view.duration !== 0;
+
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
       <div className="flex items-center justify-between mb-2">
         <span className="text-zinc-400 text-sm font-medium">SPECTROGRAM</span>
         <div className="flex items-center gap-2">
-          <label className="text-zinc-500 text-xs">Max Freq:</label>
-          <select
-            value={freqMax}
-            onChange={(e) => setFreqMax(Number(e.target.value))}
-            className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-1 text-xs"
-          >
-            <option value={8000}>8 kHz</option>
-            <option value={16000}>16 kHz</option>
-            <option value={22050}>22 kHz</option>
-            <option value={24000}>24 kHz</option>
-          </select>
+          {isZoomed && (
+            <button
+              onClick={resetZoom}
+              className="text-zinc-500 hover:text-zinc-300 text-xs"
+            >
+              Reset zoom
+            </button>
+          )}
           {loading && <span className="text-purple-400 text-xs">Loading...</span>}
+          <span className="text-zinc-600 text-xs">Scroll to zoom, drag to pan</span>
         </div>
       </div>
-      <canvas
-        ref={canvasRef}
-        className="w-full h-48 rounded"
-        style={{ imageRendering: 'pixelated' }}
-      />
+      <div
+        ref={containerRef}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        className="relative"
+        style={{ cursor: dragging ? 'grabbing' : 'grab' }}
+      >
+        <canvas
+          ref={canvasRef}
+          className="w-full h-48 rounded"
+          style={{ imageRendering: 'pixelated' }}
+        />
+      </div>
       {data && (
         <div className="flex justify-between text-zinc-500 text-xs mt-1">
           <span>{data.time_start.toFixed(1)}s</span>
-          <span>{data.freq_min / 1000}kHz - {data.freq_max / 1000}kHz</span>
+          <span>{(data.freq_min / 1000).toFixed(1)}kHz - {(data.freq_max / 1000).toFixed(1)}kHz</span>
           <span>{data.time_end.toFixed(1)}s</span>
         </div>
       )}
