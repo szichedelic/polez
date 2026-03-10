@@ -684,7 +684,7 @@ fn detect_codec_artifacts(channel: &[f32], sr: u32) -> MethodResult {
     }
 
     // Test 1: MP3 frame boundary detection (1152-sample periodicity)
-    // Compute energy at each sample position, then look for periodic dips at frame boundaries
+    // Measure time-domain sample discontinuities at frame boundaries vs random interior positions
     let frame_size = 1152;
     let n_frames = channel.len() / frame_size;
     if n_frames >= 4 {
@@ -696,15 +696,41 @@ fn detect_codec_artifacts(channel: &[f32], sr: u32) -> MethodResult {
             if boundary + 1 >= channel.len() {
                 break;
             }
-            // Energy discontinuity at frame boundary
-            let diff = (channel[boundary] as f64 - channel[boundary - 1] as f64).abs();
-            boundary_diffs.push(diff);
+            // Measure windowed energy change across the frame boundary (4 samples each side)
+            let half_win = 4.min(frame_size / 2);
+            let left_start = boundary.saturating_sub(half_win);
+            let right_end = (boundary + half_win).min(channel.len());
+            let left_energy: f64 = channel[left_start..boundary]
+                .iter()
+                .map(|&s| (s as f64) * (s as f64))
+                .sum::<f64>()
+                / half_win as f64;
+            let right_energy: f64 = channel[boundary..right_end]
+                .iter()
+                .map(|&s| (s as f64) * (s as f64))
+                .sum::<f64>()
+                / (right_end - boundary) as f64;
+            boundary_diffs.push((left_energy - right_energy).abs());
 
-            // Compare with interior sample differences
-            let mid = f * frame_size + frame_size / 2;
-            if mid + 1 < channel.len() {
-                let mid_diff = (channel[mid] as f64 - channel[mid - 1] as f64).abs();
-                interior_diffs.push(mid_diff);
+            // Sample multiple interior positions for robust comparison
+            for offset in [frame_size / 4, frame_size / 2, 3 * frame_size / 4] {
+                let pos = f * frame_size + offset;
+                let l_start = pos.saturating_sub(half_win);
+                let r_end = (pos + half_win).min(channel.len());
+                if r_end <= pos || l_start >= pos {
+                    continue;
+                }
+                let l_e: f64 = channel[l_start..pos]
+                    .iter()
+                    .map(|&s| (s as f64) * (s as f64))
+                    .sum::<f64>()
+                    / (pos - l_start) as f64;
+                let r_e: f64 = channel[pos..r_end]
+                    .iter()
+                    .map(|&s| (s as f64) * (s as f64))
+                    .sum::<f64>()
+                    / (r_end - pos) as f64;
+                interior_diffs.push((l_e - r_e).abs());
             }
         }
 
