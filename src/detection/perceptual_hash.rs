@@ -80,8 +80,8 @@ pub fn compute_hash(buffer: &AudioBuffer) -> PerceptualHash {
     // Generate hash bits by comparing adjacent chroma frames
     let mut hash_bits: Vec<u8> = Vec::new();
     for i in 1..chroma_frames.len() {
-        for bin in 0..CHROMA_BINS {
-            if chroma_frames[i][bin] > chroma_frames[i - 1][bin] {
+        for (bin, frame) in chroma_frames[i].iter().enumerate().take(CHROMA_BINS) {
+            if *frame > chroma_frames[i - 1][bin] {
                 hash_bits.push(1);
             } else {
                 hash_bits.push(0);

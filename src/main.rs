@@ -663,7 +663,6 @@ fn cmd_clean(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 fn cmd_sweep(
     directory: &Path,
     output_dir: Option<&Path>,

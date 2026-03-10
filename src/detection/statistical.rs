@@ -527,9 +527,9 @@ fn measure_spectral_continuity(channel: &[f32]) -> f64 {
     let mut frame_diffs: Vec<f64> = Vec::new();
     for i in 1..spectrogram.len() {
         let mut diff_sum = 0.0f64;
-        for bin in 0..n_freqs {
+        for (bin, curr_bin) in spectrogram[i].iter().enumerate().take(n_freqs) {
             let prev = spectrogram[i - 1][bin].norm() as f64;
-            let curr = spectrogram[i][bin].norm() as f64;
+            let curr = curr_bin.norm() as f64;
             diff_sum += (curr - prev).abs();
         }
         frame_diffs.push(diff_sum / n_freqs as f64);
