@@ -67,6 +67,34 @@ pub struct PresetInfo {
 pub struct CleanRequest {
     pub mode: Option<String>,
     pub preset: Option<String>,
+    pub advanced_flags: Option<AdvancedFlagsRequest>,
+    pub fingerprint_flags: Option<FingerprintFlagsRequest>,
+}
+
+#[derive(Deserialize)]
+pub struct AdvancedFlagsRequest {
+    pub phase_dither: Option<bool>,
+    pub comb_mask: Option<bool>,
+    pub transient_shift: Option<bool>,
+    pub resample_nudge: Option<bool>,
+    pub phase_noise: Option<bool>,
+    pub phase_swirl: Option<bool>,
+    pub masked_hf_phase: Option<bool>,
+    pub gated_resample_nudge: Option<bool>,
+    pub micro_eq_flutter: Option<bool>,
+    pub hf_decorrelate: Option<bool>,
+    pub refined_transient: Option<bool>,
+    pub adaptive_transient: Option<bool>,
+    pub adaptive_notch: Option<bool>,
+}
+
+#[derive(Deserialize)]
+pub struct FingerprintFlagsRequest {
+    pub statistical_normalization: Option<bool>,
+    pub temporal_randomization: Option<bool>,
+    pub phase_randomization: Option<bool>,
+    pub micro_timing_perturbation: Option<bool>,
+    pub human_imperfections: Option<bool>,
 }
 
 #[derive(Serialize)]

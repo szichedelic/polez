@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { cleanFile, saveCleanedFile, getPresets } from '../api/client';
-import type { CleanResponse, VerificationResult as VerResult, PresetInfo } from '../api/client';
+import { cleanFile, saveCleanedFile, getPresets, DEFAULT_ADVANCED_FLAGS, DEFAULT_FINGERPRINT_FLAGS } from '../api/client';
+import type { CleanResponse, VerificationResult as VerResult, PresetInfo, AdvancedFlags, FingerprintFlags } from '../api/client';
 
 interface Props {
   fileLoaded: boolean;
@@ -94,6 +94,50 @@ function VerificationPanel({ verification: v }: { verification: VerResult }) {
   );
 }
 
+const STEALTH_FLAG_LABELS: Record<keyof AdvancedFlags, string> = {
+  phase_dither: 'Phase Dither',
+  comb_mask: 'Comb Mask',
+  transient_shift: 'Transient Shift',
+  resample_nudge: 'Resample Nudge',
+  phase_noise: 'Phase Noise',
+  phase_swirl: 'Phase Swirl',
+  masked_hf_phase: 'Masked HF Phase',
+  gated_resample_nudge: 'Gated Resample Nudge',
+  micro_eq_flutter: 'Micro EQ Flutter',
+  hf_decorrelate: 'HF Decorrelate',
+  refined_transient: 'Refined Transient',
+  adaptive_transient: 'Adaptive Transient',
+  adaptive_notch: 'Adaptive Notch',
+};
+
+const FP_FLAG_LABELS: Record<keyof FingerprintFlags, string> = {
+  statistical_normalization: 'Statistical Normalization',
+  temporal_randomization: 'Temporal Randomization',
+  phase_randomization: 'Phase Randomization',
+  micro_timing_perturbation: 'Micro Timing Perturbation',
+  human_imperfections: 'Human Imperfections',
+};
+
+function FlagToggle({ label, checked, onChange, disabled }: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled: boolean;
+}) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        className="accent-emerald-500"
+      />
+      <span className="text-xs text-zinc-300">{label}</span>
+    </label>
+  );
+}
+
 export function CleanPanel({ fileLoaded, onCleaned }: Props) {
   const [mode, setMode] = useState('standard');
   const [preset, setPreset] = useState('');
@@ -102,6 +146,9 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<CleanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [advancedFlags, setAdvancedFlags] = useState<AdvancedFlags>({ ...DEFAULT_ADVANCED_FLAGS });
+  const [fpFlags, setFpFlags] = useState<FingerprintFlags>({ ...DEFAULT_FINGERPRINT_FLAGS });
 
   useEffect(() => {
     getPresets().then(setPresets).catch(() => {});
@@ -111,7 +158,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await cleanFile(mode, preset || undefined);
+      const res = await cleanFile(mode, preset || undefined, advancedFlags, fpFlags);
       setResult(res);
       onCleaned?.(res);
     } catch (e: any) {
@@ -130,6 +177,14 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateAdvFlag = (key: keyof AdvancedFlags, value: boolean) => {
+    setAdvancedFlags(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateFpFlag = (key: keyof FingerprintFlags, value: boolean) => {
+    setFpFlags(prev => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -194,7 +249,48 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
         </div>
       )}
 
-      {!result && !loading && (
+      <button
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="text-xs text-zinc-500 hover:text-zinc-300 mb-2 flex items-center gap-1"
+      >
+        <span>{showAdvanced ? '\u25BC' : '\u25B6'}</span>
+        Advanced Options ({Object.values(advancedFlags).filter(Boolean).length + Object.values(fpFlags).filter(Boolean).length} active)
+      </button>
+
+      {showAdvanced && (
+        <div className="bg-zinc-800 border border-zinc-700 rounded p-3 mb-3">
+          <div className="mb-3">
+            <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase">Stealth DSP Operations</h4>
+            <div className="grid grid-cols-2 gap-1">
+              {(Object.keys(STEALTH_FLAG_LABELS) as (keyof AdvancedFlags)[]).map(key => (
+                <FlagToggle
+                  key={key}
+                  label={STEALTH_FLAG_LABELS[key]}
+                  checked={advancedFlags[key]}
+                  onChange={(v) => updateAdvFlag(key, v)}
+                  disabled={loading}
+                />
+              ))}
+            </div>
+          </div>
+          <div>
+            <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase">Fingerprint Removal</h4>
+            <div className="grid grid-cols-2 gap-1">
+              {(Object.keys(FP_FLAG_LABELS) as (keyof FingerprintFlags)[]).map(key => (
+                <FlagToggle
+                  key={key}
+                  label={FP_FLAG_LABELS[key]}
+                  checked={fpFlags[key]}
+                  onChange={(v) => updateFpFlag(key, v)}
+                  disabled={loading}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!result && !loading && !showAdvanced && (
         <p className="text-zinc-500 text-sm">Select a mode and click Clean to sanitize the loaded file</p>
       )}
 

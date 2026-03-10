@@ -717,6 +717,8 @@ async fn clean_file(
 
     // Build config from preset if specified, otherwise use defaults
     let preset_name = req.preset.clone();
+    let req_adv_flags = req.advanced_flags;
+    let req_fp_flags = req.fingerprint_flags;
 
     // Run sanitization in blocking thread (CPU-bound)
     let san_result = tokio::task::spawn_blocking(move || {
@@ -733,12 +735,74 @@ async fn clean_file(
             }
         }
 
+        // Override individual flags from request
+        if let Some(af) = req_adv_flags {
+            if let Some(v) = af.phase_dither {
+                flags.phase_dither = v;
+            }
+            if let Some(v) = af.comb_mask {
+                flags.comb_mask = v;
+            }
+            if let Some(v) = af.transient_shift {
+                flags.transient_shift = v;
+            }
+            if let Some(v) = af.resample_nudge {
+                flags.resample_nudge = v;
+            }
+            if let Some(v) = af.phase_noise {
+                flags.phase_noise = v;
+            }
+            if let Some(v) = af.phase_swirl {
+                flags.phase_swirl = v;
+            }
+            if let Some(v) = af.masked_hf_phase {
+                flags.masked_hf_phase = v;
+            }
+            if let Some(v) = af.gated_resample_nudge {
+                flags.gated_resample_nudge = v;
+            }
+            if let Some(v) = af.micro_eq_flutter {
+                flags.micro_eq_flutter = v;
+            }
+            if let Some(v) = af.hf_decorrelate {
+                flags.hf_decorrelate = v;
+            }
+            if let Some(v) = af.refined_transient {
+                flags.refined_transient = v;
+            }
+            if let Some(v) = af.adaptive_transient {
+                flags.adaptive_transient = v;
+            }
+            if let Some(v) = af.adaptive_notch {
+                flags.adaptive_notch = v;
+            }
+        }
+
+        let mut fp_config = cfg.fingerprint_removal;
+        if let Some(ff) = req_fp_flags {
+            if let Some(v) = ff.statistical_normalization {
+                fp_config.statistical_normalization = v;
+            }
+            if let Some(v) = ff.temporal_randomization {
+                fp_config.temporal_randomization = v;
+            }
+            if let Some(v) = ff.phase_randomization {
+                fp_config.phase_randomization = v;
+            }
+            if let Some(v) = ff.micro_timing_perturbation {
+                fp_config.micro_timing_perturbation = v;
+            }
+            if let Some(v) = ff.human_imperfections {
+                fp_config.human_imperfections = v;
+            }
+        }
+
         let pipeline = SanitizationPipeline::new(
             mode,
             false,
             2,
             flags,
-            cfg.fingerprint_removal,
+            fp_config,
             None,
             Vec::new(),
             None,

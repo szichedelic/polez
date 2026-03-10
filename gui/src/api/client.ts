@@ -209,9 +209,64 @@ export async function getPresets(): Promise<PresetInfo[]> {
   return res.json();
 }
 
-export async function cleanFile(mode?: string, preset?: string): Promise<CleanResponse> {
-  const body: Record<string, string> = { mode: mode || 'standard' };
+export interface AdvancedFlags {
+  phase_dither: boolean;
+  comb_mask: boolean;
+  transient_shift: boolean;
+  resample_nudge: boolean;
+  phase_noise: boolean;
+  phase_swirl: boolean;
+  masked_hf_phase: boolean;
+  gated_resample_nudge: boolean;
+  micro_eq_flutter: boolean;
+  hf_decorrelate: boolean;
+  refined_transient: boolean;
+  adaptive_transient: boolean;
+  adaptive_notch: boolean;
+}
+
+export interface FingerprintFlags {
+  statistical_normalization: boolean;
+  temporal_randomization: boolean;
+  phase_randomization: boolean;
+  micro_timing_perturbation: boolean;
+  human_imperfections: boolean;
+}
+
+export const DEFAULT_ADVANCED_FLAGS: AdvancedFlags = {
+  phase_dither: true,
+  comb_mask: true,
+  transient_shift: true,
+  resample_nudge: true,
+  phase_noise: true,
+  phase_swirl: true,
+  masked_hf_phase: false,
+  gated_resample_nudge: false,
+  micro_eq_flutter: false,
+  hf_decorrelate: false,
+  refined_transient: false,
+  adaptive_transient: false,
+  adaptive_notch: false,
+};
+
+export const DEFAULT_FINGERPRINT_FLAGS: FingerprintFlags = {
+  statistical_normalization: true,
+  temporal_randomization: true,
+  phase_randomization: true,
+  micro_timing_perturbation: true,
+  human_imperfections: true,
+};
+
+export async function cleanFile(
+  mode?: string,
+  preset?: string,
+  advancedFlags?: AdvancedFlags,
+  fingerprintFlags?: FingerprintFlags,
+): Promise<CleanResponse> {
+  const body: Record<string, unknown> = { mode: mode || 'standard' };
   if (preset) body.preset = preset;
+  if (advancedFlags) body.advanced_flags = advancedFlags;
+  if (fingerprintFlags) body.fingerprint_flags = fingerprintFlags;
   const res = await fetch(`${BASE}/api/clean`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
