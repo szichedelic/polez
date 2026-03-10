@@ -424,4 +424,123 @@ mod tests {
         );
         assert!(output_path.exists());
     }
+
+    // --- Effectiveness benchmark tests ---
+
+    fn watermarked_buffer() -> AudioBuffer {
+        // Create a signal with characteristics that trigger watermark detection:
+        // 440 Hz base tone + high-frequency watermark-like components
+        let sr = 44100u32;
+        let len = sr as usize; // 1 second
+        let samples: Vec<f32> = (0..len)
+            .map(|i| {
+                let t = i as f32 / sr as f32;
+                let base = (2.0 * std::f32::consts::PI * 440.0 * t).sin() * 0.4;
+                // Simulate spread-spectrum watermark in ultrasonic band
+                let wm1 = (2.0 * std::f32::consts::PI * 18500.0 * t).sin() * 0.05;
+                let wm2 = (2.0 * std::f32::consts::PI * 19500.0 * t).sin() * 0.04;
+                let wm3 = (2.0 * std::f32::consts::PI * 20500.0 * t).sin() * 0.03;
+                // Add periodic amplitude modulation (echo-like pattern)
+                let mod_factor = 1.0 + 0.02 * (2.0 * std::f32::consts::PI * 50.0 * t).sin();
+                (base + wm1 + wm2 + wm3) * mod_factor
+            })
+            .collect();
+        AudioBuffer::from_mono(samples, sr)
+    }
+
+    fn detect_confidence(buf: &AudioBuffer) -> f64 {
+        WatermarkDetector::detect_all(buf).overall_confidence
+    }
+
+    /// Process buffer with full pipeline normalization (mimics run() behavior).
+    fn process_with_normalization(buf: &AudioBuffer, mode: SanitizationMode) -> (AudioBuffer, f64) {
+        let original_rms = buf.rms();
+        let mut cleaned = buf.clone();
+        let pipeline = make_pipeline(mode);
+        pipeline.process_buffer(&mut cleaned).unwrap();
+
+        // Reproduce the normalization that run() does
+        if cleaned.rms() > 1e-10 && original_rms > 1e-10 {
+            cleaned.normalize_rms(original_rms);
+        }
+        cleaned.soft_clip(0.99);
+
+        let quality_loss = if original_rms > 1e-10 {
+            (original_rms - cleaned.rms()).abs() / original_rms
+        } else {
+            0.0
+        };
+        (cleaned, quality_loss as f64)
+    }
+
+    #[test]
+    fn test_standard_mode_processes_watermarks() {
+        let buf = watermarked_buffer();
+        let before = detect_confidence(&buf);
+
+        let (cleaned, _) = process_with_normalization(&buf, SanitizationMode::Standard);
+        let after = detect_confidence(&cleaned);
+
+        // Standard mode should at least not make things significantly worse
+        assert!(
+            after <= before + 0.3,
+            "Standard mode made watermarks much worse: before={before}, after={after}"
+        );
+    }
+
+    #[test]
+    fn test_modes_produce_different_outputs() {
+        let buf = watermarked_buffer();
+        let original_rms = buf.rms();
+
+        let (fast, _) = process_with_normalization(&buf, SanitizationMode::Fast);
+        let (standard, _) = process_with_normalization(&buf, SanitizationMode::Standard);
+
+        // Fast and Standard should produce different results
+        let diff: f32 = fast
+            .to_mono_samples()
+            .iter()
+            .zip(standard.to_mono_samples().iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f32>()
+            / buf.num_samples() as f32;
+
+        assert!(
+            diff > 1e-6 || original_rms < 1e-10,
+            "Fast and Standard produced identical output (diff={diff})"
+        );
+    }
+
+    #[test]
+    fn test_all_modes_bounded_quality_loss() {
+        let buf = watermarked_buffer();
+
+        let modes = [
+            (SanitizationMode::Fast, 0.01),
+            (SanitizationMode::Standard, 0.05),
+            (SanitizationMode::Preserving, 0.05),
+            (SanitizationMode::Aggressive, 0.05),
+        ];
+
+        for (mode, max_loss) in modes {
+            let (_, loss) = process_with_normalization(&buf, mode);
+            assert!(
+                loss < max_loss,
+                "{mode:?} quality loss {loss:.4} exceeds max {max_loss}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_preserving_mode_quality_better_than_aggressive() {
+        let buf = watermarked_buffer();
+
+        let (_, preserving_loss) = process_with_normalization(&buf, SanitizationMode::Preserving);
+        let (_, aggressive_loss) = process_with_normalization(&buf, SanitizationMode::Aggressive);
+
+        assert!(
+            preserving_loss <= aggressive_loss + 0.02,
+            "Preserving ({preserving_loss:.4}) worse quality than Aggressive ({aggressive_loss:.4})"
+        );
+    }
 }
