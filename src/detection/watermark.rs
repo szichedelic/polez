@@ -45,6 +45,7 @@ impl WatermarkDetector {
         "frequency_domain",
         "lsb_steganography",
         "codec_artifacts",
+        "phase_coherence",
     ];
 
     /// Run all detection methods on the audio buffer.
@@ -92,6 +93,26 @@ impl WatermarkDetector {
                 result.watermark_count += 1;
             }
             result.method_results.insert(name.to_string(), mr);
+        }
+
+        // Phase coherence needs the full buffer (stereo analysis)
+        let run_phase_coherence = match filter {
+            Some(f) => f.iter().any(|name| name == "phase_coherence"),
+            None => true,
+        };
+        if run_phase_coherence {
+            let mr = detect_phase_coherence(buffer);
+            if mr.detected {
+                result.detected.push(WatermarkDetection {
+                    method: "phase_coherence".to_string(),
+                    confidence: mr.confidence,
+                    description: mr.details.first().cloned().unwrap_or_default(),
+                });
+                result.watermark_count += 1;
+            }
+            result
+                .method_results
+                .insert("phase_coherence".to_string(), mr);
         }
 
         result.overall_confidence = if result.detected.is_empty() {
@@ -784,6 +805,197 @@ fn detect_codec_artifacts(channel: &[f32], sr: u32) -> MethodResult {
     }
 
     if max_confidence > 0.25 {
+        result.detected = true;
+    }
+
+    result.confidence = max_confidence;
+    result
+}
+
+/// Method 9: Phase coherence detection.
+/// Detects watermarks embedded via phase manipulation between channels or time segments.
+/// For stereo: analyzes inter-channel phase difference statistics.
+/// For mono: analyzes temporal phase consistency across segments.
+fn detect_phase_coherence(buffer: &AudioBuffer) -> MethodResult {
+    let mut result = MethodResult::default();
+    let mut max_confidence: f64 = 0.0;
+    let sr = buffer.sample_rate;
+
+    if buffer.num_samples() < 8192 {
+        return result;
+    }
+
+    if buffer.is_stereo() {
+        // Stereo: analyze inter-channel phase differences
+        let left: Vec<f32> = buffer.channel(0).to_vec();
+        let right: Vec<f32> = buffer.channel(1).to_vec();
+
+        let nperseg = 2048;
+        let noverlap = nperseg * 3 / 4;
+        let (spec_l, _) = stft::stft(&left, nperseg, noverlap);
+        let (spec_r, _) = stft::stft(&right, nperseg, noverlap);
+
+        let n_frames = spec_l.len().min(spec_r.len());
+        if n_frames < 2 {
+            return result;
+        }
+        let n_freqs = spec_l[0].len();
+
+        // Compute phase difference stability per frequency band
+        let bands = [
+            (100.0, 1000.0, "low-mid"),
+            (1000.0, 4000.0, "mid"),
+            (4000.0, 8000.0, "high-mid"),
+            (8000.0, 16000.0, "high"),
+        ];
+        let freq_res = sr as f64 / nperseg as f64;
+
+        for &(lo, hi, band_name) in &bands {
+            let lo_bin = (lo / freq_res) as usize;
+            let hi_bin = ((hi / freq_res) as usize).min(n_freqs);
+            if lo_bin >= hi_bin {
+                continue;
+            }
+
+            // Collect phase differences across frames for this band
+            let mut phase_diff_stds: Vec<f64> = Vec::new();
+
+            for bin in lo_bin..hi_bin {
+                let diffs: Vec<f64> = (0..n_frames)
+                    .map(|f| {
+                        let pl = spec_l[f][bin].arg() as f64;
+                        let pr = spec_r[f][bin].arg() as f64;
+                        let mut d = pl - pr;
+                        while d > std::f64::consts::PI {
+                            d -= 2.0 * std::f64::consts::PI;
+                        }
+                        while d < -std::f64::consts::PI {
+                            d += 2.0 * std::f64::consts::PI;
+                        }
+                        d
+                    })
+                    .collect();
+
+                let mean: f64 = diffs.iter().sum::<f64>() / diffs.len() as f64;
+                let var: f64 =
+                    diffs.iter().map(|&d| (d - mean).powi(2)).sum::<f64>() / diffs.len() as f64;
+                phase_diff_stds.push(var.sqrt());
+            }
+
+            if phase_diff_stds.is_empty() {
+                continue;
+            }
+
+            let avg_std: f64 = phase_diff_stds.iter().sum::<f64>() / phase_diff_stds.len() as f64;
+            let locked_ratio = phase_diff_stds.iter().filter(|&&s| s < 0.1).count() as f64
+                / phase_diff_stds.len() as f64;
+
+            if locked_ratio > 0.3 {
+                let conf = (locked_ratio * 0.9).min(1.0);
+                max_confidence = max_confidence.max(conf);
+                result.details.push(format!(
+                    "Stereo phase lock in {band_name} band: {:.0}% bins locked (avg std {avg_std:.3})",
+                    locked_ratio * 100.0
+                ));
+            }
+        }
+    } else {
+        // Mono: analyze temporal phase consistency across consecutive segments
+        let channel: Vec<f32> = buffer.channel(0).to_vec();
+        let segment_size = 8192;
+        let n_segments = channel.len() / segment_size;
+
+        if n_segments < 3 {
+            return result;
+        }
+
+        let nperseg = 2048;
+        let noverlap = nperseg / 2;
+
+        let mut segment_specs: Vec<Vec<Vec<num_complex::Complex<f32>>>> = Vec::new();
+        for s in 0..n_segments.min(16) {
+            let start = s * segment_size;
+            let end = (start + segment_size).min(channel.len());
+            let (spec, _) = stft::stft(&channel[start..end], nperseg, noverlap);
+            if !spec.is_empty() {
+                segment_specs.push(spec);
+            }
+        }
+
+        if segment_specs.len() < 3 {
+            return result;
+        }
+
+        let n_freqs = segment_specs[0][0].len();
+        let mut coherence_scores: Vec<f64> = Vec::new();
+
+        for i in 1..segment_specs.len() {
+            let frames_a = &segment_specs[i - 1];
+            let frames_b = &segment_specs[i];
+            let min_frames = frames_a.len().min(frames_b.len());
+
+            if min_frames == 0 {
+                continue;
+            }
+
+            let mut coherence_sum = 0.0f64;
+            let mut count = 0usize;
+
+            for f in 0..min_frames {
+                for bin in 1..n_freqs {
+                    let pa = frames_a[f][bin].arg() as f64;
+                    let pb = frames_b[f][bin].arg() as f64;
+                    coherence_sum += (pa - pb).cos();
+                    count += 1;
+                }
+            }
+
+            if count > 0 {
+                coherence_scores.push(coherence_sum / count as f64);
+            }
+        }
+
+        if coherence_scores.is_empty() {
+            return result;
+        }
+
+        let avg_coherence: f64 =
+            coherence_scores.iter().sum::<f64>() / coherence_scores.len() as f64;
+        let coherence_std: f64 = {
+            let var = coherence_scores
+                .iter()
+                .map(|&c| (c - avg_coherence).powi(2))
+                .sum::<f64>()
+                / coherence_scores.len() as f64;
+            var.sqrt()
+        };
+
+        if avg_coherence > 0.7 && coherence_std < 0.1 {
+            let conf = (avg_coherence * 0.8).min(1.0);
+            max_confidence = max_confidence.max(conf);
+            result.details.push(format!(
+                "Temporal phase coherence: avg={avg_coherence:.3}, std={coherence_std:.3}"
+            ));
+        }
+
+        if coherence_scores.len() >= 4 {
+            let diffs: Vec<f64> = coherence_scores
+                .windows(2)
+                .map(|w| (w[1] - w[0]).abs())
+                .collect();
+            let avg_diff: f64 = diffs.iter().sum::<f64>() / diffs.len() as f64;
+
+            if avg_diff < 0.05 && avg_coherence > 0.5 {
+                let conf = ((0.1 - avg_diff) * 10.0).min(0.9);
+                max_confidence = max_confidence.max(conf);
+                result.details.push(format!(
+                    "Periodic phase pattern: segment-to-segment variation {avg_diff:.4}"
+                ));
+            }
+        }
+    }
+
+    if max_confidence > 0.3 {
         result.detected = true;
     }
 
