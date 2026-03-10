@@ -38,7 +38,8 @@ struct JsonReport {
     sample_rate: u32,
     channels: usize,
     watermark: detection::WatermarkResult,
-    metadata: detection::MetadataScanResult,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<detection::MetadataScanResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
     statistical: Option<detection::StatisticalResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -494,7 +495,7 @@ fn cmd_clean(
             sample_rate: audio_buf.sample_rate,
             channels: audio_buf.num_channels(),
             watermark: watermark_result,
-            metadata: scan_result,
+            metadata: Some(scan_result),
             statistical: None,
             polez: None,
             sanitization: None,
@@ -584,7 +585,7 @@ fn cmd_clean(
             sample_rate: audio_buf.sample_rate,
             channels: audio_buf.num_channels(),
             watermark: watermark_result,
-            metadata: scan_result,
+            metadata: Some(scan_result),
             statistical: None,
             polez: None,
             sanitization: Some(SanitizationReport {
@@ -606,7 +607,7 @@ fn cmd_clean(
             sample_rate: audio_buf.sample_rate,
             channels: audio_buf.num_channels(),
             watermark: watermark_result,
-            metadata: scan_result,
+            metadata: Some(scan_result),
             statistical: None,
             polez: None,
             sanitization: Some(SanitizationReport {
@@ -869,18 +870,31 @@ fn cmd_detect(
         }
     }
 
+    let is_filtered = filter.is_some();
+
     if !json_mode {
         console.info(&format!("Forensic analysis: {}", input_file.display()));
         console.info("Scanning for digital footprints...");
     }
 
-    let scan_result = MetadataScanner::scan(input_file)?;
+    // When --filter is specified, skip metadata and polez detection for speed
+    let scan_result = if is_filtered {
+        None
+    } else {
+        Some(MetadataScanner::scan(input_file)?)
+    };
+
     let (audio_buf, src_format) = audio::load_audio(input_file)?;
 
     let watermark_result = WatermarkDetector::detect_filtered(&audio_buf, filter.as_deref());
-    let polez_result = detection::PolezDetector::detect(&audio_buf);
 
-    let stat_result = if deep {
+    let polez_result = if is_filtered {
+        None
+    } else {
+        Some(detection::PolezDetector::detect(&audio_buf))
+    };
+
+    let stat_result = if deep && !is_filtered {
         Some(StatisticalAnalyzer::analyze(&audio_buf))
     } else {
         None
@@ -896,7 +910,7 @@ fn cmd_detect(
             watermark: watermark_result,
             metadata: scan_result,
             statistical: stat_result,
-            polez: Some(polez_result),
+            polez: polez_result,
             sanitization: None,
         };
         return print_json(&json_report);
@@ -911,10 +925,13 @@ fn cmd_detect(
     let ai_probability = stat_result.as_ref().map(|s| s.ai_probability);
     let anomaly_count = stat_result.as_ref().map(|s| s.anomalies.len()).unwrap_or(0);
 
-    let threats_found = scan_result.tags.len()
-        + scan_result.suspicious_chunks.len()
-        + watermark_result.watermark_count
-        + anomaly_count;
+    let metadata_tags = scan_result.as_ref().map_or(0, |s| s.tags.len());
+    let suspicious_chunks = scan_result
+        .as_ref()
+        .map_or(0, |s| s.suspicious_chunks.len());
+
+    let threats_found =
+        metadata_tags + suspicious_chunks + watermark_result.watermark_count + anomaly_count;
 
     let threat_level = if threats_found > 10 {
         "HIGH"
@@ -930,15 +947,17 @@ fn cmd_detect(
         duration_secs: audio_buf.duration_secs(),
         sample_rate: audio_buf.sample_rate,
         channels: audio_buf.num_channels(),
-        metadata_tags: scan_result.tags.len(),
-        suspicious_chunks: scan_result.suspicious_chunks.len(),
+        metadata_tags,
+        suspicious_chunks,
         threats_found,
         threat_level: threat_level.to_string(),
         watermark_results: Some(watermark_display),
         ai_probability,
     });
 
-    display_polez_results(&polez_result, console);
+    if let Some(ref polez) = polez_result {
+        display_polez_results(polez, console);
+    }
 
     match threat_level {
         "HIGH" => console.error("HIGH THREAT LEVEL - This file is heavily watermarked!"),
@@ -956,7 +975,7 @@ fn cmd_detect(
             watermark: watermark_result,
             metadata: scan_result,
             statistical: stat_result,
-            polez: Some(polez_result),
+            polez: polez_result,
             sanitization: None,
         };
         write_json_report(&json_report, report_path)?;
