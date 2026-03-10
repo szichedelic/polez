@@ -238,9 +238,12 @@ async fn load_file(
         channels: buffer.num_channels(),
     };
 
+    let waveform_cache = super::WaveformCache::from_buffer(&buffer);
+
     let mut state = state.write().await;
     state.file_path = Some(req.path);
     state.format = Some(info.format.clone());
+    state.waveform_cache = Some(waveform_cache);
     state.buffer = Some(buffer);
 
     Ok(Json(info))
@@ -311,10 +314,13 @@ async fn upload_file(
         channels: buffer.num_channels(),
     };
 
+    let waveform_cache = super::WaveformCache::from_buffer(&buffer);
+
     let mut app_state = state.write().await;
     app_state.temp_paths.push(persisted_path);
     app_state.file_path = Some(path_str);
     app_state.format = Some(info.format.clone());
+    app_state.waveform_cache = Some(waveform_cache);
     app_state.buffer = Some(buffer);
 
     Ok(Json(info))
@@ -449,13 +455,33 @@ async fn get_waveform(
         .as_ref()
         .ok_or((StatusCode::BAD_REQUEST, "No file loaded".to_string()))?;
 
+    let width = query.width.unwrap_or(1024).max(1);
+    let duration_secs = buffer.num_samples() as f64 / buffer.sample_rate as f64;
+    let start_sec = query.start.unwrap_or(0.0).max(0.0);
+    let end_sec = query.end.unwrap_or(duration_secs).min(duration_secs);
+
+    // Use cached overview when resolution is sufficient (avoids to_mono_samples allocation)
+    if let Some(cache) = &state.waveform_cache {
+        let range_frac = (end_sec - start_sec) / cache.duration_secs;
+        let cache_points_in_range = (range_frac * cache.min.len() as f64) as usize;
+
+        // Cache is sufficient if it has at least as many points as requested
+        if cache_points_in_range >= width {
+            let (min_vals, max_vals) = cache.slice_for_range(start_sec, end_sec, width);
+            return Ok(Json(WaveformData {
+                min: min_vals,
+                max: max_vals,
+                sample_rate: cache.sample_rate,
+                duration_secs: cache.duration_secs,
+                channels: cache.channels,
+            }));
+        }
+    }
+
+    // High-zoom: compute from raw samples for the requested range only
     let samples = buffer.to_mono_samples();
     let sr = buffer.sample_rate as f64;
     let total_samples = samples.len();
-    let duration_secs = total_samples as f64 / sr;
-
-    let start_sec = query.start.unwrap_or(0.0).max(0.0);
-    let end_sec = query.end.unwrap_or(duration_secs).min(duration_secs);
     let start_idx = (start_sec * sr) as usize;
     let end_idx = ((end_sec * sr) as usize).min(total_samples);
 
@@ -464,7 +490,6 @@ async fn get_waveform(
     }
 
     let slice = &samples[start_idx..end_idx];
-    let width = query.width.unwrap_or(1024).max(1);
     let chunk_size = (slice.len() / width).max(1);
 
     let mut min_vals = Vec::with_capacity(width);
@@ -925,8 +950,10 @@ async fn clean_file(
 
     // Store cleaned state and track temp file for cleanup
     {
+        let cleaned_cache = super::WaveformCache::from_buffer(&cleaned_buffer);
         let mut s = state.write().await;
         s.temp_paths.push(output_path);
+        s.cleaned_waveform_cache = Some(cleaned_cache);
         s.cleaned_buffer = Some(cleaned_buffer);
         s.cleaned_file_path = Some(output_path_str);
         s.cleaned_format = Some(cleaned_fmt.to_string());
@@ -984,13 +1011,32 @@ async fn get_cleaned_waveform(
         "No cleaned file available".to_string(),
     ))?;
 
+    let width = query.width.unwrap_or(1024).max(1);
+    let duration_secs = buffer.num_samples() as f64 / buffer.sample_rate as f64;
+    let start_sec = query.start.unwrap_or(0.0).max(0.0);
+    let end_sec = query.end.unwrap_or(duration_secs).min(duration_secs);
+
+    // Use cached overview when resolution is sufficient
+    if let Some(cache) = &state.cleaned_waveform_cache {
+        let range_frac = (end_sec - start_sec) / cache.duration_secs;
+        let cache_points_in_range = (range_frac * cache.min.len() as f64) as usize;
+
+        if cache_points_in_range >= width {
+            let (min_vals, max_vals) = cache.slice_for_range(start_sec, end_sec, width);
+            return Ok(Json(WaveformData {
+                min: min_vals,
+                max: max_vals,
+                sample_rate: cache.sample_rate,
+                duration_secs: cache.duration_secs,
+                channels: cache.channels,
+            }));
+        }
+    }
+
+    // High-zoom: compute from raw samples
     let samples = buffer.to_mono_samples();
     let sr = buffer.sample_rate as f64;
     let total_samples = samples.len();
-    let duration_secs = total_samples as f64 / sr;
-
-    let start_sec = query.start.unwrap_or(0.0).max(0.0);
-    let end_sec = query.end.unwrap_or(duration_secs).min(duration_secs);
     let start_idx = (start_sec * sr) as usize;
     let end_idx = ((end_sec * sr) as usize).min(total_samples);
 
@@ -999,7 +1045,6 @@ async fn get_cleaned_waveform(
     }
 
     let slice = &samples[start_idx..end_idx];
-    let width = query.width.unwrap_or(1024).max(1);
     let chunk_size = (slice.len() / width).max(1);
 
     let mut min_vals = Vec::with_capacity(width);
