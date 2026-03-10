@@ -918,15 +918,16 @@ fn detect_codec_artifacts(channel: &[f32], sr: u32) -> MethodResult {
 }
 
 /// Method 9: Phase coherence detection.
-/// Detects watermarks embedded via phase manipulation between channels or time segments.
-/// For stereo: analyzes inter-channel phase difference statistics.
-/// For mono: analyzes temporal phase consistency across segments.
+/// Detects watermarks embedded via phase manipulation between channels.
+/// Only meaningful for stereo/multi-channel audio — mono files are skipped since
+/// inter-channel phase coherence is undefined and temporal analysis produces false
+/// positives on tonal content.
 fn detect_phase_coherence(buffer: &AudioBuffer) -> MethodResult {
     let mut result = MethodResult::default();
     let mut max_confidence: f64 = 0.0;
     let sr = buffer.sample_rate;
 
-    if buffer.num_samples() < 8192 {
+    if buffer.num_samples() < 8192 || buffer.is_mono() {
         return result;
     }
 
