@@ -40,6 +40,10 @@ pub enum Commands {
         #[arg(long)]
         backup: bool,
 
+        /// Run detection and analysis only, without writing output
+        #[arg(long)]
+        dry_run: bool,
+
         /// Output audio format
         #[arg(short, long, value_enum, default_value = "preserve")]
         format: FormatChoice,

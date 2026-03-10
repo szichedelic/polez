@@ -64,6 +64,7 @@ fn run_command(
             paranoid,
             verify,
             backup,
+            dry_run,
             format,
             flags,
             fp_flags,
@@ -73,6 +74,7 @@ fn run_command(
             paranoid,
             verify,
             backup,
+            dry_run,
             format,
             flags.into(),
             fp_flags.into(),
@@ -151,6 +153,7 @@ fn cmd_clean(
     paranoid: bool,
     verify: bool,
     backup: bool,
+    dry_run: bool,
     format: FormatChoice,
     flags: config::AdvancedFlags,
     fp_config: config::FingerprintRemovalConfig,
@@ -234,6 +237,11 @@ fn cmd_clean(
         ));
     } else {
         console.warning("No obvious threats detected... but we'll clean it anyway!");
+    }
+
+    if dry_run {
+        console.info("Dry run complete — no output file written.");
+        return Ok(());
     }
 
     let mode = SanitizationPipeline::mode_from_config(&config_mgr.config);
