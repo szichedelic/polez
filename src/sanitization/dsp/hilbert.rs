@@ -46,3 +46,47 @@ pub fn hilbert(signal: &[f32]) -> Vec<Complex<f32>> {
 pub fn envelope(signal: &[f32]) -> Vec<f32> {
     hilbert(signal).iter().map(|c| c.norm()).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    use std::f32::consts::PI;
+
+    proptest! {
+        #[test]
+        fn prop_hilbert_preserves_length(len in 64usize..4096) {
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (2.0 * PI * 440.0 * i as f32 / 44100.0).sin())
+                .collect();
+            let analytic = hilbert(&signal);
+            prop_assert_eq!(analytic.len(), signal.len());
+        }
+
+        #[test]
+        fn prop_hilbert_real_part_matches_input(freq in 100.0f32..5000.0) {
+            let len = 4096;
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (2.0 * PI * freq * i as f32 / 44100.0).sin())
+                .collect();
+            let analytic = hilbert(&signal);
+            // Real part of analytic signal should match original input
+            let max_err = signal.iter().zip(&analytic)
+                .map(|(s, a)| (s - a.re).abs())
+                .fold(0.0f32, f32::max);
+            prop_assert!(max_err < 1e-4,
+                "Hilbert real part differs from input by {max_err} for freq {freq}");
+        }
+
+        #[test]
+        fn prop_envelope_nonnegative(freq in 100.0f32..5000.0) {
+            let signal: Vec<f32> = (0..2048)
+                .map(|i| (2.0 * PI * freq * i as f32 / 44100.0).sin())
+                .collect();
+            let env = envelope(&signal);
+            for (i, &v) in env.iter().enumerate() {
+                prop_assert!(v >= 0.0, "Envelope negative at index {i}: {v}");
+            }
+        }
+    }
+}

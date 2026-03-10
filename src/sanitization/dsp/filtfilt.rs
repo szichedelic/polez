@@ -41,6 +41,7 @@ pub fn filtfilt(signal: &[f32], coeffs: &BiquadCoefficients) -> Vec<f32> {
 mod tests {
     use super::*;
     use crate::sanitization::dsp::biquad::butterworth_lowpass;
+    use proptest::prelude::*;
 
     #[test]
     fn test_filtfilt_preserves_length() {
@@ -83,5 +84,30 @@ mod tests {
         let coeffs = butterworth_lowpass(1000.0, 44100);
         let result = filtfilt(&short, &coeffs);
         assert_eq!(result.len(), 3);
+    }
+
+    proptest! {
+        #[test]
+        fn prop_filtfilt_preserves_length(len in 10usize..5000) {
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (i as f32 * 0.1).sin())
+                .collect();
+            let coeffs = butterworth_lowpass(5000.0, 44100);
+            let result = filtfilt(&signal, &coeffs);
+            prop_assert_eq!(result.len(), signal.len());
+        }
+
+        #[test]
+        fn prop_filtfilt_output_bounded(amplitude in 0.01f32..1.0) {
+            let signal: Vec<f32> = (0..4410)
+                .map(|i| amplitude * (2.0 * std::f32::consts::PI * 200.0 * i as f32 / 44100.0).sin())
+                .collect();
+            let coeffs = butterworth_lowpass(5000.0, 44100);
+            let result = filtfilt(&signal, &coeffs);
+            let max_out = result.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+            // Double-filtered LP should not exceed input amplitude (with small tolerance)
+            prop_assert!(max_out <= amplitude * 1.2,
+                "filtfilt output {max_out} exceeds input amplitude {amplitude}");
+        }
     }
 }

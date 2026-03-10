@@ -196,6 +196,7 @@ pub fn biquad_process(signal: &[f32], coeffs: &BiquadCoefficients) -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     fn sine_signal(freq: f32, sr: u32, len: usize) -> Vec<f32> {
         (0..len)
@@ -262,5 +263,58 @@ mod tests {
     fn test_empty_signal() {
         let coeffs = butterworth_lowpass(1000.0, 44100);
         assert!(biquad_process(&[], &coeffs).is_empty());
+    }
+
+    proptest! {
+        #[test]
+        fn prop_biquad_output_bounded(amplitude in 0.01f32..1.0, freq in 100.0f32..10000.0) {
+            let sr = 44100u32;
+            let signal: Vec<f32> = (0..4410)
+                .map(|i| amplitude * (2.0 * std::f32::consts::PI * freq * i as f32 / sr as f32).sin())
+                .collect();
+            let coeffs = butterworth_lowpass(5000.0, sr);
+            let filtered = biquad_process(&signal, &coeffs);
+            // A stable filter should not amplify beyond input amplitude (for lowpass)
+            let max_out = filtered.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+            // Allow small overshoot from transient response (1.5x)
+            prop_assert!(max_out <= amplitude * 1.5,
+                "Output {max_out} exceeds 1.5x input amplitude {amplitude}");
+        }
+
+        #[test]
+        fn prop_biquad_preserves_length(len in 10usize..5000) {
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (i as f32 * 0.1).sin())
+                .collect();
+            let coeffs = butterworth_lowpass(5000.0, 44100);
+            let filtered = biquad_process(&signal, &coeffs);
+            prop_assert_eq!(filtered.len(), signal.len());
+        }
+
+        #[test]
+        fn prop_biquad_coefficients_finite(cutoff in 100.0f64..20000.0) {
+            let coeffs = butterworth_lowpass(cutoff, 44100);
+            prop_assert!(coeffs.b0.is_finite());
+            prop_assert!(coeffs.b1.is_finite());
+            prop_assert!(coeffs.b2.is_finite());
+            prop_assert!(coeffs.a1.is_finite());
+            prop_assert!(coeffs.a2.is_finite());
+        }
+
+        #[test]
+        fn prop_allpass_preserves_magnitude(freq in 200.0f32..5000.0) {
+            let sr = 44100u32;
+            let signal: Vec<f32> = (0..4410)
+                .map(|i| (2.0 * std::f32::consts::PI * freq * i as f32 / sr as f32).sin())
+                .collect();
+            let coeffs = allpass_filter(1000.0, 0.707, sr);
+            let filtered = biquad_process(&signal, &coeffs);
+            let in_rms = signal_rms(&signal);
+            let out_rms = signal_rms(&filtered);
+            // Allpass should preserve energy (within 10% tolerance for edge effects)
+            let ratio = out_rms / in_rms;
+            prop_assert!(ratio > 0.9 && ratio < 1.1,
+                "Allpass RMS ratio {ratio} out of range for freq {freq}");
+        }
     }
 }

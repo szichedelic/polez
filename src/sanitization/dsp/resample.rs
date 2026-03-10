@@ -52,7 +52,7 @@ pub fn resample(signal: &[f32], sr_in: u32, sr_out: u32) -> Vec<f32> {
 }
 
 /// Simple linear interpolation resampling as a fallback.
-fn linear_resample(signal: &[f32], ratio: f64) -> Vec<f32> {
+pub fn linear_resample(signal: &[f32], ratio: f64) -> Vec<f32> {
     let out_len = (signal.len() as f64 * ratio) as usize;
     let mut output = Vec::with_capacity(out_len);
 
@@ -67,4 +67,60 @@ fn linear_resample(signal: &[f32], ratio: f64) -> Vec<f32> {
     }
 
     output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn signal_energy(signal: &[f32]) -> f64 {
+        signal.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / signal.len() as f64
+    }
+
+    proptest! {
+        #[test]
+        fn prop_resample_identity_same_rate(len in 1024usize..8192) {
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 44100.0).sin())
+                .collect();
+            let result = resample(&signal, 44100, 44100);
+            prop_assert_eq!(result.len(), signal.len());
+            let max_diff = signal.iter().zip(&result)
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0f32, f32::max);
+            prop_assert!(max_diff < 1e-6, "Same-rate resample changed signal: {max_diff}");
+        }
+
+        #[test]
+        fn prop_resample_preserves_energy(sr_out in prop::sample::select(vec![22050u32, 32000, 48000, 96000])) {
+            let sr_in = 44100u32;
+            let len = 4096;
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / sr_in as f32).sin())
+                .collect();
+            let result = resample(&signal, sr_in, sr_out);
+            let in_energy = signal_energy(&signal);
+            let out_energy = signal_energy(&result);
+            // Energy per sample should be roughly preserved (within 20% tolerance)
+            let ratio = out_energy / in_energy;
+            prop_assert!(ratio > 0.8 && ratio < 1.2,
+                "Energy ratio {ratio} out of range for {sr_in} -> {sr_out}");
+        }
+
+        #[test]
+        fn prop_resample_correct_length(sr_out in prop::sample::select(vec![22050u32, 48000, 96000])) {
+            let sr_in = 44100u32;
+            let len = 4096;
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (i as f32 * 0.01).sin())
+                .collect();
+            let result = resample(&signal, sr_in, sr_out);
+            let expected_len = (len as f64 * sr_out as f64 / sr_in as f64) as usize;
+            // Allow tolerance on output length due to chunking
+            let diff = (result.len() as i64 - expected_len as i64).unsigned_abs();
+            prop_assert!(diff < expected_len as u64 / 20 + 1024,
+                "Output len {} far from expected {} for {} -> {}", result.len(), expected_len, sr_in, sr_out);
+        }
+    }
 }

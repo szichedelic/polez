@@ -161,6 +161,7 @@ pub fn real_ifft(spectrum: &[Complex<f32>], output_len: usize) -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use std::f32::consts::PI;
 
     #[test]
@@ -193,5 +194,50 @@ mod tests {
             max_err < 1e-5,
             "STFT roundtrip max error too large: {max_err}"
         );
+    }
+
+    proptest! {
+        #[test]
+        fn prop_stft_roundtrip_preserves_length(len in 4096usize..16384) {
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (2.0 * PI * 440.0 * i as f32 / 44100.0).sin())
+                .collect();
+            let nperseg = 2048;
+            let noverlap = nperseg * 3 / 4;
+            let (spec, orig_len) = stft(&signal, nperseg, noverlap);
+            let reconstructed = istft(&spec, nperseg, noverlap, orig_len);
+            prop_assert_eq!(reconstructed.len(), signal.len());
+        }
+
+        #[test]
+        fn prop_stft_roundtrip_low_error(freq in 100.0f32..10000.0) {
+            let len = 8192;
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (2.0 * PI * freq * i as f32 / 44100.0).sin())
+                .collect();
+            let nperseg = 2048;
+            let noverlap = nperseg * 3 / 4;
+            let (spec, orig_len) = stft(&signal, nperseg, noverlap);
+            let reconstructed = istft(&spec, nperseg, noverlap, orig_len);
+            let max_err = signal.iter().zip(&reconstructed)
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0f32, f32::max);
+            prop_assert!(max_err < 1e-4, "Max error {max_err} for freq {freq}");
+        }
+
+        #[test]
+        fn prop_real_fft_ifft_roundtrip(len in 512usize..4096) {
+            // Ensure even length for real FFT symmetry
+            let len = len & !1;
+            let signal: Vec<f32> = (0..len)
+                .map(|i| (2.0 * PI * 440.0 * i as f32 / 44100.0).sin() * 0.5)
+                .collect();
+            let spectrum = real_fft(&signal);
+            let reconstructed = real_ifft(&spectrum, len);
+            let max_err = signal.iter().zip(&reconstructed)
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0f32, f32::max);
+            prop_assert!(max_err < 1e-4, "Real FFT roundtrip error {max_err}");
+        }
     }
 }
