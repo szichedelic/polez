@@ -9,6 +9,7 @@ import { CleanPanel } from './components/CleanPanel';
 import { AudioPlayer } from './components/AudioPlayer';
 import { ComparisonTimeline } from './components/ComparisonTimeline';
 import { MetadataViewer } from './components/MetadataViewer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function App() {
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
@@ -21,22 +22,43 @@ function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <FileHeader fileInfo={fileInfo} onFileLoaded={handleFileLoaded} />
+      <ErrorBoundary section="Upload">
+        <FileHeader fileInfo={fileInfo} onFileLoaded={handleFileLoaded} />
+      </ErrorBoundary>
 
       <div className="p-4 space-y-4">
-        <AudioPlayer fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
-        <Waveform fileLoaded={!!fileInfo} />
-        <Spectrogram fileLoaded={!!fileInfo} />
+        <ErrorBoundary section="Audio Player">
+          <AudioPlayer fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
+        </ErrorBoundary>
+
+        <ErrorBoundary section="Waveform">
+          <Waveform fileLoaded={!!fileInfo} />
+        </ErrorBoundary>
+
+        <ErrorBoundary section="Spectrogram">
+          <Spectrogram fileLoaded={!!fileInfo} />
+        </ErrorBoundary>
 
         <div className="grid grid-cols-2 gap-4">
-          <DetectionPanel fileLoaded={!!fileInfo} />
-          <BitPlaneViewer fileLoaded={!!fileInfo} />
+          <ErrorBoundary section="Detection">
+            <DetectionPanel fileLoaded={!!fileInfo} />
+          </ErrorBoundary>
+          <ErrorBoundary section="Bit Plane">
+            <BitPlaneViewer fileLoaded={!!fileInfo} />
+          </ErrorBoundary>
         </div>
 
-        <MetadataViewer fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
+        <ErrorBoundary section="Metadata">
+          <MetadataViewer fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
+        </ErrorBoundary>
 
-        <CleanPanel fileLoaded={!!fileInfo} onCleaned={() => setHasCleaned(true)} />
-        <ComparisonTimeline fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
+        <ErrorBoundary section="Cleaning">
+          <CleanPanel fileLoaded={!!fileInfo} onCleaned={() => setHasCleaned(true)} />
+        </ErrorBoundary>
+
+        <ErrorBoundary section="Comparison">
+          <ComparisonTimeline fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
+        </ErrorBoundary>
       </div>
     </div>
   );
