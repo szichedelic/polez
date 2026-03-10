@@ -346,6 +346,9 @@ pub enum ConfigAction {
 
     /// Reset configuration to defaults
     Reset,
+
+    /// Validate current configuration and report issues
+    Validate,
 }
 
 #[derive(Clone, Copy, ValueEnum)]

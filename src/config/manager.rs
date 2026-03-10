@@ -136,6 +136,122 @@ impl ConfigManager {
         }
     }
 
+    /// Validate the current configuration and return a list of issues found.
+    /// Errors are critical problems, warnings are potential issues.
+    pub fn validate(&self) -> Vec<ConfigIssue> {
+        let mut issues = Vec::new();
+
+        // Validate spectral cleaning ranges
+        if self.config.spectral_cleaning.high_freq_cutoff == 0 {
+            issues.push(ConfigIssue::error(
+                "spectral_cleaning.high_freq_cutoff",
+                "must be greater than 0",
+            ));
+        }
+        if self.config.spectral_cleaning.smoothing_window == 0 {
+            issues.push(ConfigIssue::error(
+                "spectral_cleaning.smoothing_window",
+                "must be greater than 0",
+            ));
+        }
+
+        // Validate quality preservation
+        if self.config.quality_preservation.target_snr == 0 {
+            issues.push(ConfigIssue::warning(
+                "quality_preservation.target_snr",
+                "target SNR of 0 may produce poor quality output",
+            ));
+        }
+
+        // Validate batch processing
+        if self.config.batch_processing.workers == 0 {
+            issues.push(ConfigIssue::error(
+                "batch_processing.workers",
+                "must be at least 1",
+            ));
+        }
+
+        // Validate naming pattern has placeholder
+        if !self
+            .config
+            .batch_processing
+            .naming_pattern
+            .contains("{name}")
+        {
+            issues.push(ConfigIssue::warning(
+                "batch_processing.naming_pattern",
+                "pattern should contain {name} placeholder for the original filename",
+            ));
+        }
+
+        // Validate mp3 quality
+        if self.config.formats.mp3.quality > 9 {
+            issues.push(ConfigIssue::error(
+                "formats.mp3.quality",
+                "must be 0-9 (0=best, 9=worst)",
+            ));
+        }
+
+        issues
+    }
+
+    /// Check the raw YAML for unknown fields and return warnings.
+    pub fn check_unknown_fields(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        if !self.config_file.exists() {
+            return warnings;
+        }
+
+        let contents = match std::fs::read_to_string(&self.config_file) {
+            Ok(c) => c,
+            Err(_) => return warnings,
+        };
+
+        let raw: serde_yaml::Value = match serde_yaml::from_str(&contents) {
+            Ok(v) => v,
+            Err(_) => return warnings,
+        };
+
+        let known_top_level = [
+            "version",
+            "paranoia_level",
+            "preserve_quality",
+            "output_format",
+            "backup_originals",
+            "preset",
+            "audio_processing",
+            "watermark_detection",
+            "spectral_cleaning",
+            "metadata_cleaning",
+            "fingerprint_removal",
+            "quality_preservation",
+            "batch_processing",
+            "verification",
+            "ui",
+            "formats",
+            "advanced_flags",
+        ];
+
+        if let Some(mapping) = raw.as_mapping() {
+            for (key, _) in mapping {
+                if let Some(key_str) = key.as_str() {
+                    if !known_top_level.contains(&key_str) {
+                        let suggestion = find_closest_match(key_str, &known_top_level);
+                        let msg = if let Some(closest) = suggestion {
+                            format!("Unknown config field '{key_str}' — did you mean '{closest}'?")
+                        } else {
+                            format!("Unknown config field '{key_str}'")
+                        };
+                        warnings.push(msg);
+                    }
+                }
+            }
+        }
+
+        warnings
+    }
+
     pub fn save(&self) -> Result<()> {
         std::fs::create_dir_all(&self.config_dir)
             .map_err(|e| PolezError::Config(format!("Failed to create config dir: {e}")))?;
@@ -228,6 +344,66 @@ impl ConfigManager {
     pub fn config_dir(&self) -> &Path {
         &self.config_dir
     }
+}
+
+/// A validation issue found in the config.
+pub struct ConfigIssue {
+    pub field: String,
+    pub message: String,
+    pub is_error: bool,
+}
+
+impl ConfigIssue {
+    fn error(field: &str, message: &str) -> Self {
+        Self {
+            field: field.to_string(),
+            message: message.to_string(),
+            is_error: true,
+        }
+    }
+
+    fn warning(field: &str, message: &str) -> Self {
+        Self {
+            field: field.to_string(),
+            message: message.to_string(),
+            is_error: false,
+        }
+    }
+}
+
+/// Find the closest matching string using edit distance.
+fn find_closest_match<'a>(input: &str, candidates: &[&'a str]) -> Option<&'a str> {
+    let mut best: Option<(&str, usize)> = None;
+    for &candidate in candidates {
+        let dist = edit_distance(input, candidate);
+        // Only suggest if within 3 edits
+        if dist <= 3 && (best.is_none() || dist < best.unwrap().1) {
+            best = Some((candidate, dist));
+        }
+    }
+    best.map(|(s, _)| s)
+}
+
+/// Simple Levenshtein edit distance.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let mut dp = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+    for (i, row) in dp.iter_mut().enumerate().take(a.len() + 1) {
+        row[0] = i;
+    }
+    for j in 0..=b.len() {
+        dp[0][j] = j;
+    }
+    for i in 1..=a.len() {
+        for j in 1..=b.len() {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+    dp[a.len()][b.len()]
 }
 
 fn get_config_dir() -> Result<PathBuf> {

@@ -1479,6 +1479,34 @@ fn cmd_config(action: Option<ConfigAction>, console: &ConsoleManager) -> error::
             console.success("Configuration reset to defaults");
             Ok(())
         }
+        Some(ConfigAction::Validate) => {
+            let config_mgr = ConfigManager::new()?;
+
+            let unknown = config_mgr.check_unknown_fields();
+            let issues = config_mgr.validate();
+
+            let mut has_problems = false;
+
+            for warning in &unknown {
+                console.warning(warning);
+                has_problems = true;
+            }
+
+            for issue in &issues {
+                if issue.is_error {
+                    console.error(&format!("{}: {}", issue.field, issue.message));
+                } else {
+                    console.warning(&format!("{}: {}", issue.field, issue.message));
+                }
+                has_problems = true;
+            }
+
+            if !has_problems {
+                console.success("Configuration is valid");
+            }
+
+            Ok(())
+        }
     }
 }
 
