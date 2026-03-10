@@ -39,18 +39,18 @@ export function Waveform({ fileLoaded }: Props) {
 
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <span className="text-zinc-400 text-sm font-medium">WAVEFORM</span>
         <div className="flex gap-2">
           <button
             onClick={() => wsRef.current?.playPause()}
-            className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-1 rounded text-sm"
+            className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
           >
             Play/Pause
           </button>
           <button
             onClick={() => wsRef.current?.stop()}
-            className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-1 rounded text-sm"
+            className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
           >
             Stop
           </button>

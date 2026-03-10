@@ -77,7 +77,7 @@ function App() {
 
       {showShortcuts && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
           onClick={() => setShowShortcuts(false)}
         >
           <div
@@ -122,12 +122,14 @@ function App() {
           <Spectrogram fileLoaded={!!fileInfo} />
         </ErrorBoundary>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ErrorBoundary section="Detection">
             <DetectionPanel fileLoaded={!!fileInfo} />
           </ErrorBoundary>
           <ErrorBoundary section="Bit Plane">
-            <BitPlaneViewer fileLoaded={!!fileInfo} />
+            <div className="hidden md:block">
+              <BitPlaneViewer fileLoaded={!!fileInfo} />
+            </div>
           </ErrorBoundary>
         </div>
 

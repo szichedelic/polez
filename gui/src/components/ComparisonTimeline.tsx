@@ -134,16 +134,16 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
 
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="text-zinc-400 text-sm font-medium">A/B COMPARISON</span>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex gap-1">
             {(['both', 'original', 'cleaned'] as const).map((src) => (
               <button
                 key={src}
                 onClick={() => handleSourceToggle(src)}
-                className={`px-2 py-0.5 rounded text-xs capitalize ${
+                className={`px-2 py-1.5 sm:py-0.5 rounded text-xs capitalize min-h-[44px] sm:min-h-0 ${
                   activeSource === src
                     ? src === 'cleaned'
                       ? 'bg-emerald-700 text-emerald-100'
@@ -158,35 +158,35 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
             ))}
           </div>
 
-          <div className="w-px h-4 bg-zinc-700" />
+          <div className="hidden sm:block w-px h-4 bg-zinc-700" />
 
           <div className="flex gap-1">
             <button
               onClick={() => setViewMode('side-by-side')}
-              className={`px-2 py-0.5 rounded text-xs ${viewMode === 'side-by-side' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`px-2 py-1.5 sm:py-0.5 rounded text-xs min-h-[44px] sm:min-h-0 ${viewMode === 'side-by-side' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               Split
             </button>
             <button
               onClick={() => setViewMode('overlay')}
-              className={`px-2 py-0.5 rounded text-xs ${viewMode === 'overlay' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`px-2 py-1.5 sm:py-0.5 rounded text-xs min-h-[44px] sm:min-h-0 ${viewMode === 'overlay' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               Overlay
             </button>
           </div>
 
-          <div className="w-px h-4 bg-zinc-700" />
+          <div className="hidden sm:block w-px h-4 bg-zinc-700" />
 
           <div className="flex gap-2">
             <button
               onClick={togglePlayPause}
-              className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-1 rounded text-sm"
+              className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
             >
               {playing ? 'Pause' : 'Play'}
             </button>
             <button
               onClick={stop}
-              className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-1 rounded text-sm"
+              className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
             >
               Stop
             </button>
@@ -195,7 +195,7 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
       </div>
 
       {viewMode === 'side-by-side' ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 rounded-full bg-purple-500" />

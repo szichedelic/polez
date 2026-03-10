@@ -168,19 +168,19 @@ export function Spectrogram({ fileLoaded }: Props) {
 
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <span className="text-zinc-400 text-sm font-medium">SPECTROGRAM</span>
         <div className="flex items-center gap-2">
           {isZoomed && (
             <button
               onClick={resetZoom}
-              className="text-zinc-500 hover:text-zinc-300 text-xs"
+              className="text-zinc-500 hover:text-zinc-300 text-xs min-h-[44px] sm:min-h-0"
             >
               Reset zoom
             </button>
           )}
           {loading && <span className="text-purple-400 text-xs">Loading...</span>}
-          <span className="text-zinc-600 text-xs">Scroll to zoom, drag to pan</span>
+          <span className="text-zinc-600 text-xs hidden sm:inline">Scroll to zoom, drag to pan</span>
         </div>
       </div>
       <div

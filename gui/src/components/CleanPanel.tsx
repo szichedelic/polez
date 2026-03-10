@@ -76,7 +76,7 @@ function VerificationPanel({ verification: v }: { verification: VerResult }) {
           <div className="text-sm text-zinc-200">{v.original_threats} &rarr; {v.remaining_threats}</div>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <div>
           <div className="text-xs text-zinc-500 mb-1">SNR</div>
           <div className="text-sm text-zinc-200">{snrDisplay}</div>
@@ -189,15 +189,15 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
 
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="text-zinc-400 text-sm font-medium">CLEAN</span>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           {presets.length > 0 && (
             <select
               value={preset}
               onChange={(e) => setPreset(e.target.value)}
               disabled={loading}
-              className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-1 text-xs"
+              className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-2 sm:py-1 text-xs min-h-[44px] sm:min-h-0"
               title={preset ? presets.find(p => p.name === preset)?.description : 'No preset (use defaults)'}
             >
               <option value="">No Preset</option>
@@ -210,7 +210,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
             value={mode}
             onChange={(e) => setMode(e.target.value)}
             disabled={loading}
-            className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-1 text-xs"
+            className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-2 sm:py-1 text-xs min-h-[44px] sm:min-h-0"
           >
             <option value="fast">Fast</option>
             <option value="standard">Standard</option>
@@ -221,7 +221,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
             data-action="clean"
             onClick={handleClean}
             disabled={!fileLoaded || loading}
-            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-1 rounded text-xs font-medium"
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
           >
             {loading ? 'Cleaning...' : 'Clean'}
           </button>
@@ -230,7 +230,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
               data-action="save"
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1 rounded text-xs font-medium"
+              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
             >
               {saving ? 'Saving...' : 'Save File'}
             </button>
@@ -263,7 +263,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
         <div className="bg-zinc-800 border border-zinc-700 rounded p-3 mb-3">
           <div className="mb-3">
             <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase">Stealth DSP Operations</h4>
-            <div className="grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
               {(Object.keys(STEALTH_FLAG_LABELS) as (keyof AdvancedFlags)[]).map(key => (
                 <FlagToggle
                   key={key}
@@ -277,7 +277,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
           </div>
           <div>
             <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase">Fingerprint Removal</h4>
-            <div className="grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
               {(Object.keys(FP_FLAG_LABELS) as (keyof FingerprintFlags)[]).map(key => (
                 <FlagToggle
                   key={key}
@@ -302,7 +302,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
 
       {result && (
         <>
-          <div className="flex gap-4 text-xs text-zinc-400 mb-3">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400 mb-3">
             <span>Quality loss: {result.quality_loss.toFixed(2)}%</span>
             <span>Time: {result.processing_time.toFixed(1)}s</span>
             <span>Metadata removed: {result.metadata_removed}</span>
@@ -311,9 +311,10 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
 
           <VerificationPanel verification={result.verification} />
 
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <DetectionColumn title="Before" data={result.before} />
-            <div className="w-px bg-zinc-700" />
+            <div className="hidden sm:block w-px bg-zinc-700" />
+            <div className="sm:hidden h-px bg-zinc-700" />
             <DetectionColumn title="After" data={result.after} />
           </div>
         </>

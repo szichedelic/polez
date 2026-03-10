@@ -49,21 +49,21 @@ export function DetectionPanel({ fileLoaded }: Props) {
 
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="text-zinc-400 text-sm font-medium">DETECTION</span>
         <div className="flex gap-2">
           <button
             data-action="detect"
             onClick={() => runAnalysis('all')}
             disabled={!fileLoaded || !!loading}
-            className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-1 rounded text-xs font-medium"
+            className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
           >
             {loading === 'all' ? 'Running...' : 'Run All'}
           </button>
           <select
             onChange={(e) => { if (e.target.value) runAnalysis(e.target.value); e.target.value = ''; }}
             disabled={!fileLoaded || !!loading}
-            className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-1 text-xs"
+            className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-2 sm:py-1 text-xs min-h-[44px] sm:min-h-0"
           >
             <option value="">Pick Analysis...</option>
             <option value="watermark">Watermark</option>

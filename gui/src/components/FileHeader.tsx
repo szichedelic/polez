@@ -70,10 +70,10 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
 
   if (fileInfo && !loading) {
     return (
-      <div className="flex items-center gap-4 bg-zinc-900 border-b border-zinc-700 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4 bg-zinc-900 border-b border-zinc-700 px-4 py-3">
         <span className="text-purple-400 font-bold text-lg tracking-wider">POLEZ</span>
-        <div className="flex items-center gap-4 text-zinc-400 text-sm flex-1">
-          <span className="text-zinc-200 font-medium">{fileInfo.file_path.split('/').pop()}</span>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-zinc-400 text-sm flex-1 min-w-0">
+          <span className="text-zinc-200 font-medium truncate">{fileInfo.file_path.split('/').pop()}</span>
           <span>{fileInfo.format.toUpperCase()}</span>
           <span>{fileInfo.sample_rate / 1000}kHz</span>
           <span>{fileInfo.channels}ch</span>
@@ -81,7 +81,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
         </div>
         <button
           onClick={() => inputRef.current?.click()}
-          className="text-zinc-400 hover:text-zinc-200 text-sm"
+          className="text-zinc-400 hover:text-zinc-200 text-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
           Change file
         </button>
@@ -129,7 +129,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
           <div className="text-zinc-500 text-xs">or</div>
           <button
             onClick={() => inputRef.current?.click()}
-            className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-1.5 rounded text-sm font-medium"
+            className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 sm:py-1.5 rounded text-sm font-medium min-h-[44px]"
           >
             Choose File
           </button>

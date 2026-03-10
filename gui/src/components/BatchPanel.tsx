@@ -92,14 +92,14 @@ export function BatchPanel() {
 
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="text-zinc-400 text-sm font-medium">BATCH PROCESSING</span>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value)}
             disabled={processing}
-            className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-1 text-xs"
+            className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-2 sm:py-1 text-xs min-h-[44px] sm:min-h-0"
           >
             <option value="fast">Fast</option>
             <option value="standard">Standard</option>
@@ -109,14 +109,14 @@ export function BatchPanel() {
           <button
             onClick={handleProcess}
             disabled={processing || files.length === 0}
-            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-1 rounded text-xs font-medium"
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
           >
             {processing ? 'Processing...' : `Clean ${files.length} file${files.length !== 1 ? 's' : ''}`}
           </button>
           {files.length > 0 && !processing && (
             <button
               onClick={clearAll}
-              className="text-zinc-500 hover:text-zinc-300 text-xs"
+              className="text-zinc-500 hover:text-zinc-300 text-xs min-h-[44px] sm:min-h-0"
             >
               Clear
             </button>
@@ -140,7 +140,7 @@ export function BatchPanel() {
         <button
           onClick={() => inputRef.current?.click()}
           disabled={processing}
-          className="text-purple-400 hover:text-purple-300 text-xs"
+          className="text-purple-400 hover:text-purple-300 text-xs min-h-[44px] sm:min-h-0"
         >
           or choose files
         </button>

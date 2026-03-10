@@ -107,10 +107,10 @@ export function AudioPlayer({ fileLoaded, hasCleaned }: Props) {
         onEnded={onEnded}
       />
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           onClick={togglePlay}
-          className="w-8 h-8 flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-200 shrink-0"
+          className="w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-200 shrink-0"
           title={playing ? 'Pause' : 'Play'}
         >
           {playing ? (
@@ -155,7 +155,7 @@ export function AudioPlayer({ fileLoaded, hasCleaned }: Props) {
           {formatTime(duration)}
         </span>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="hidden sm:flex items-center gap-1.5 shrink-0">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" className="text-zinc-500">
             <polygon points="1,5 4,5 7,2 7,12 4,9 1,9" />
             {volume > 0.5 && <path d="M9,3 Q13,7 9,11" fill="none" stroke="currentColor" strokeWidth="1.5" />}
@@ -176,13 +176,13 @@ export function AudioPlayer({ fileLoaded, hasCleaned }: Props) {
           <div className="flex gap-1 shrink-0 ml-1">
             <button
               onClick={() => setSource('original')}
-              className={`px-2 py-0.5 rounded text-xs ${source === 'original' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`px-2 py-1.5 sm:py-0.5 rounded text-xs min-h-[44px] sm:min-h-0 ${source === 'original' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               Original
             </button>
             <button
               onClick={() => setSource('cleaned')}
-              className={`px-2 py-0.5 rounded text-xs ${source === 'cleaned' ? 'bg-emerald-700 text-emerald-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`px-2 py-1.5 sm:py-0.5 rounded text-xs min-h-[44px] sm:min-h-0 ${source === 'cleaned' ? 'bg-emerald-700 text-emerald-100' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               Cleaned
             </button>
