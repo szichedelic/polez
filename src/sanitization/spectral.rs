@@ -2,6 +2,7 @@ use num_complex::Complex;
 use rand::Rng;
 
 use super::dsp::{biquad, filtfilt, stft};
+use super::psychoacoustic::MaskingModel;
 use crate::audio::AudioBuffer;
 use crate::config::AdvancedFlags;
 use crate::error::Result;
@@ -64,12 +65,20 @@ impl SpectralCleaner {
                 let freq_resolution = sr as f64 / nperseg as f64;
                 let high_freq_start = (15000.0 / freq_resolution) as usize;
 
+                // Compute psychoacoustic masking thresholds per frame
+                let masking = MaskingModel::new(sr as f64, nperseg);
+                let thresholds: Vec<Vec<f32>> = spectrogram
+                    .iter()
+                    .map(|frame| masking.compute_threshold(frame))
+                    .collect();
+
                 let (f2, s2) = apply_periodic_disruption(
                     &mut spectrogram,
                     high_freq_start,
                     paranoid,
                     freq_ranges,
                     freq_resolution,
+                    &thresholds,
                 );
                 found += f2;
                 suppressed += s2;
@@ -79,12 +88,14 @@ impl SpectralCleaner {
                     high_freq_start,
                     freq_ranges,
                     freq_resolution,
+                    &thresholds,
                 );
                 apply_spread_spectrum_attenuation(
                     &mut spectrogram,
                     high_freq_start,
                     freq_ranges,
                     freq_resolution,
+                    &thresholds,
                 );
 
                 // Single ISTFT reconstruction
@@ -219,23 +230,31 @@ fn notch_watermark_bands(channel: &[f32], sr: u32) -> Vec<f32> {
 
 /// Disrupt periodic patterns by randomizing phase in high-frequency bins.
 /// Operates on an already-computed spectrogram (no STFT/ISTFT).
+/// Only modifies bins whose magnitude is below the psychoacoustic masking
+/// threshold, preserving perceptually important components.
 fn apply_periodic_disruption(
     spectrogram: &mut [Vec<Complex<f32>>],
     high_freq_start: usize,
     paranoid: bool,
     freq_ranges: &[(f64, f64)],
     freq_resolution: f64,
+    thresholds: &[Vec<f32>],
 ) -> (usize, usize) {
     let mut rng = rand::thread_rng();
     let phase_noise = if paranoid { 0.05 } else { 0.02 };
     let mut found = 0;
 
-    for frame in spectrogram.iter_mut() {
+    for (frame_idx, frame) in spectrogram.iter_mut().enumerate() {
+        let thresh = &thresholds[frame_idx];
         for (bin, val) in frame.iter_mut().enumerate().skip(high_freq_start) {
             if !bin_in_range(bin, freq_resolution, freq_ranges) {
                 continue;
             }
             let mag = val.norm();
+            // In paranoid mode, modify all bins; otherwise respect masking threshold
+            if !paranoid && bin < thresh.len() && !MaskingModel::is_masked(mag, thresh[bin]) {
+                continue;
+            }
             let phase = val.arg();
             let new_phase = phase + rng.gen_range(-phase_noise..phase_noise) as f32;
             *val = Complex::from_polar(mag, new_phase);
@@ -252,20 +271,27 @@ fn apply_periodic_disruption(
 /// Only smooths bins above 15kHz where watermarks live. Uses magnitude-only
 /// averaging (preserving original phase) to avoid the massive signal
 /// cancellation that complex-domain averaging causes.
+/// Respects psychoacoustic masking: bins above the masking threshold are skipped.
 fn apply_spectral_smoothing(
     spectrogram: &mut [Vec<Complex<f32>>],
     high_freq_start: usize,
     freq_ranges: &[(f64, f64)],
     freq_resolution: f64,
+    thresholds: &[Vec<f32>],
 ) {
     let window = 5;
     let half = window / 2;
 
-    for frame in spectrogram.iter_mut() {
+    for (frame_idx, frame) in spectrogram.iter_mut().enumerate() {
+        let thresh = &thresholds[frame_idx];
         let original: Vec<Complex<f32>> = frame.clone();
         let start = high_freq_start.max(half);
         for i in start..frame.len().saturating_sub(half) {
             if !bin_in_range(i, freq_resolution, freq_ranges) {
+                continue;
+            }
+            // Skip perceptually important bins
+            if i < thresh.len() && !MaskingModel::is_masked(original[i].norm(), thresh[i]) {
                 continue;
             }
             let avg_mag = original[i - half..=i + half]
@@ -299,15 +325,22 @@ fn adaptive_noise_shaping(channel: &mut [f32], sr: u32, paranoid: bool) {
 
 /// Attenuate spread-spectrum patterns in high-frequency bins.
 /// Operates on an already-computed spectrogram (no STFT/ISTFT).
+/// Respects psychoacoustic masking: only attenuates bins below the threshold.
 fn apply_spread_spectrum_attenuation(
     spectrogram: &mut [Vec<Complex<f32>>],
     high_freq_start: usize,
     freq_ranges: &[(f64, f64)],
     freq_resolution: f64,
+    thresholds: &[Vec<f32>],
 ) {
-    for frame in spectrogram.iter_mut() {
+    for (frame_idx, frame) in spectrogram.iter_mut().enumerate() {
+        let thresh = &thresholds[frame_idx];
         for (bin, val) in frame.iter_mut().enumerate().skip(high_freq_start) {
             if !bin_in_range(bin, freq_resolution, freq_ranges) {
+                continue;
+            }
+            // Skip perceptually important bins
+            if bin < thresh.len() && !MaskingModel::is_masked(val.norm(), thresh[bin]) {
                 continue;
             }
             *val *= 0.8;
