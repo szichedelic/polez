@@ -27,23 +27,34 @@ export function Spectrogram({ fileLoaded }: Props) {
   const [view, setView] = useState<ViewRange>(DEFAULT_VIEW);
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef<{ x: number; y: number; view: ViewRange } | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedView, setDebouncedView] = useState<ViewRange>(DEFAULT_VIEW);
+
+  // Debounce view changes so API calls don't fire on every scroll tick
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedView(view);
+    }, 200);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [view]);
 
   const fetchData = useCallback(async () => {
     if (!fileLoaded) return;
     setLoading(true);
     try {
       const opts: Parameters<typeof getSpectrogram>[0] = {
-        freq_min: view.freqMin,
-        freq_max: view.freqMax,
+        freq_min: debouncedView.freqMin,
+        freq_max: debouncedView.freqMax,
       };
-      if (view.timeStart > 0) opts.start = view.timeStart;
-      if (view.duration > 0) opts.duration = view.duration;
+      if (debouncedView.timeStart > 0) opts.start = debouncedView.timeStart;
+      if (debouncedView.duration > 0) opts.duration = debouncedView.duration;
       const d = await getSpectrogram(opts);
       setData(d);
     } finally {
       setLoading(false);
     }
-  }, [fileLoaded, view]);
+  }, [fileLoaded, debouncedView]);
 
   useEffect(() => {
     fetchData();
@@ -90,41 +101,54 @@ export function Spectrogram({ fileLoaded }: Props) {
     ctx.putImageData(imageData, 0, 0);
   }, [data]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    if (!data) return;
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // Attach wheel listener as non-passive so preventDefault works
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const xFrac = (e.clientX - rect.left) / rect.width;
-    const yFrac = 1 - (e.clientY - rect.top) / rect.height;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const d = dataRef.current;
+      if (!d) return;
 
-    const zoomFactor = e.deltaY > 0 ? 1.2 : 0.8;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-    setView(prev => {
-      const freqRange = prev.freqMax - prev.freqMin;
-      const timeRange = prev.duration > 0 ? prev.duration : (data.time_end - data.time_start);
+      const rect = canvas.getBoundingClientRect();
+      const xFrac = (e.clientX - rect.left) / rect.width;
+      const yFrac = 1 - (e.clientY - rect.top) / rect.height;
 
-      const newFreqRange = Math.max(500, Math.min(24000, freqRange * zoomFactor));
-      const newTimeRange = Math.max(0.5, timeRange * zoomFactor);
+      const zoomFactor = e.deltaY > 0 ? 1.2 : 0.8;
 
-      const freqCenter = prev.freqMin + freqRange * yFrac;
-      const timeCenter = prev.timeStart + timeRange * xFrac;
+      setView(prev => {
+        const freqRange = prev.freqMax - prev.freqMin;
+        const timeRange = prev.duration > 0 ? prev.duration : (d.time_end - d.time_start);
 
-      const newFreqMin = Math.max(0, freqCenter - newFreqRange * yFrac);
-      const newFreqMax = Math.min(24000, newFreqMin + newFreqRange);
-      const newTimeStart = Math.max(0, timeCenter - newTimeRange * xFrac);
+        const newFreqRange = Math.max(500, Math.min(24000, freqRange * zoomFactor));
+        const newTimeRange = Math.max(0.5, timeRange * zoomFactor);
 
-      return {
-        freqMin: Math.round(newFreqMin),
-        freqMax: Math.round(newFreqMax),
-        timeStart: Math.round(newTimeStart * 100) / 100,
-        duration: Math.round(newTimeRange * 100) / 100,
-      };
-    });
-  }, [data]);
+        const freqCenter = prev.freqMin + freqRange * yFrac;
+        const timeCenter = prev.timeStart + timeRange * xFrac;
+
+        const newFreqMin = Math.max(0, freqCenter - newFreqRange * yFrac);
+        const newFreqMax = Math.min(24000, newFreqMin + newFreqRange);
+        const newTimeStart = Math.max(0, timeCenter - newTimeRange * xFrac);
+
+        return {
+          freqMin: Math.round(newFreqMin),
+          freqMax: Math.round(newFreqMax),
+          timeStart: Math.round(newTimeStart * 100) / 100,
+          duration: Math.round(newTimeRange * 100) / 100,
+        };
+      });
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => container.removeEventListener('wheel', onWheel);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -186,7 +210,6 @@ export function Spectrogram({ fileLoaded }: Props) {
       </div>
       <div
         ref={containerRef}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
