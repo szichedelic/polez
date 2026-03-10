@@ -232,3 +232,143 @@ impl AudioBuffer {
         AudioBuffer::new(output, sample_rate)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sine_mono(len: usize, freq: f32, sr: u32) -> AudioBuffer {
+        let data: Vec<f32> = (0..len)
+            .map(|i| (2.0 * std::f32::consts::PI * freq * i as f32 / sr as f32).sin())
+            .collect();
+        AudioBuffer::from_mono(data, sr)
+    }
+
+    #[test]
+    fn test_from_mono() {
+        let buf = AudioBuffer::from_mono(vec![0.1, 0.2, 0.3], 44100);
+        assert_eq!(buf.num_samples(), 3);
+        assert_eq!(buf.num_channels(), 1);
+        assert!(buf.is_mono());
+        assert!(!buf.is_stereo());
+        assert_eq!(buf.sample_rate, 44100);
+    }
+
+    #[test]
+    fn test_from_interleaved_stereo() {
+        let interleaved = vec![0.1, -0.1, 0.2, -0.2, 0.3, -0.3];
+        let buf = AudioBuffer::from_interleaved(&interleaved, 2, 48000);
+        assert_eq!(buf.num_samples(), 3);
+        assert_eq!(buf.num_channels(), 2);
+        assert!(buf.is_stereo());
+        assert!((buf.channel(0)[0] - 0.1).abs() < 1e-6);
+        assert!((buf.channel(1)[0] - -0.1).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_duration_secs() {
+        let buf = AudioBuffer::from_mono(vec![0.0; 44100], 44100);
+        assert!((buf.duration_secs() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_to_mono_from_stereo() {
+        let interleaved = vec![0.4, 0.6, 0.2, 0.8];
+        let buf = AudioBuffer::from_interleaved(&interleaved, 2, 44100);
+        let mono = buf.to_mono();
+        assert!(mono.is_mono());
+        assert_eq!(mono.num_samples(), 2);
+        assert!((mono.channel(0)[0] - 0.5).abs() < 1e-6);
+        assert!((mono.channel(0)[1] - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_to_mono_samples() {
+        let buf = AudioBuffer::from_mono(vec![0.1, 0.2, 0.3], 44100);
+        let samples = buf.to_mono_samples();
+        assert_eq!(samples.len(), 3);
+        assert!((samples[1] - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_to_interleaved_roundtrip() {
+        let original = vec![0.1, -0.1, 0.2, -0.2];
+        let buf = AudioBuffer::from_interleaved(&original, 2, 44100);
+        let result = buf.to_interleaved();
+        for (a, b) in original.iter().zip(result.iter()) {
+            assert!((a - b).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_rms() {
+        // Constant signal: RMS should equal the value
+        let buf = AudioBuffer::from_mono(vec![0.5; 100], 44100);
+        assert!((buf.rms() - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_peak() {
+        let buf = AudioBuffer::from_mono(vec![0.1, -0.9, 0.3, 0.5], 44100);
+        assert!((buf.peak() - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_normalize_rms() {
+        let mut buf = sine_mono(4410, 440.0, 44100);
+        buf.normalize_rms(0.1);
+        assert!((buf.rms() - 0.1).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_hard_clip() {
+        let mut buf = AudioBuffer::from_mono(vec![1.5, -2.0, 0.5], 44100);
+        buf.hard_clip();
+        assert!((buf.channel(0)[0] - 1.0).abs() < 1e-6);
+        assert!((buf.channel(0)[1] - -1.0).abs() < 1e-6);
+        assert!((buf.channel(0)[2] - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_soft_clip() {
+        let mut buf = AudioBuffer::from_mono(vec![2.0, 0.3, -2.0], 44100);
+        buf.soft_clip(0.8);
+        assert!(buf.channel(0)[0] < 1.0);
+        assert!(buf.channel(0)[0] > 0.7);
+        assert!((buf.channel(0)[1] - 0.3).abs() < 1e-6); // below threshold, unchanged
+    }
+
+    #[test]
+    fn test_channel_mut() {
+        let mut buf = AudioBuffer::from_mono(vec![0.0; 10], 44100);
+        {
+            let mut ch = buf.channel_mut(0);
+            ch[5] = 0.42;
+        }
+        assert!((buf.channel(0)[5] - 0.42).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_split_and_join_chunks() {
+        let original =
+            AudioBuffer::from_mono((0..1000).map(|i| i as f32 / 1000.0).collect(), 44100);
+        let chunks = original.split_chunks(300, 50);
+        assert!(chunks.len() >= 3);
+
+        let joined = AudioBuffer::join_chunks(&chunks, 50);
+        assert_eq!(joined.num_samples(), original.num_samples());
+    }
+
+    #[test]
+    fn test_join_single_chunk() {
+        let buf = AudioBuffer::from_mono(vec![0.1, 0.2], 44100);
+        let joined = AudioBuffer::join_chunks(&[buf.clone()], 0);
+        assert_eq!(joined.num_samples(), 2);
+    }
+
+    #[test]
+    fn test_join_empty_chunks() {
+        let joined = AudioBuffer::join_chunks(&[], 0);
+        assert_eq!(joined.num_samples(), 0);
+    }
+}

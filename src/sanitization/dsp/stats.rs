@@ -250,3 +250,104 @@ pub fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
         0.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mean() {
+        assert!((mean(&[1.0, 2.0, 3.0, 4.0, 5.0]) - 3.0).abs() < 1e-10);
+        assert_eq!(mean(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_std_dev() {
+        let data: Vec<f32> = vec![2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0];
+        let sd = std_dev(&data);
+        assert!((sd - 2.138).abs() < 0.01);
+        assert_eq!(std_dev(&[1.0]), 0.0);
+    }
+
+    #[test]
+    fn test_skewness_symmetric() {
+        let data: Vec<f32> = (-100..=100).map(|i| i as f32 / 100.0).collect();
+        assert!(skewness(&data).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_kurtosis_uniform() {
+        let data: Vec<f32> = (0..10000).map(|i| i as f32 / 10000.0).collect();
+        let k = kurtosis(&data);
+        assert!((k - (-1.2)).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_entropy() {
+        let uniform = vec![0.25, 0.25, 0.25, 0.25];
+        assert!((entropy(&uniform) - (4.0_f64).ln()).abs() < 1e-10);
+        assert_eq!(entropy(&[1.0, 0.0, 0.0]), 0.0);
+    }
+
+    #[test]
+    fn test_histogram() {
+        let data: Vec<f32> = vec![0.0, 0.1, 0.2, 0.5, 0.9, 1.0];
+        let hist = histogram(&data, 2);
+        assert_eq!(hist.len(), 2);
+        assert!((hist.iter().sum::<f64>() - 1.0).abs() < 1e-10);
+        assert!(histogram(&[], 10).is_empty());
+    }
+
+    #[test]
+    fn test_spectral_centroid() {
+        assert!(spectral_centroid(&[1.0, 0.0, 0.0, 0.0]) < 0.01);
+        assert!((spectral_centroid(&[0.0, 0.0, 0.0, 1.0]) - 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_spectral_flatness() {
+        let flat = vec![1.0_f32; 100];
+        assert!((spectral_flatness(&flat) - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_spectral_rolloff() {
+        let mag = vec![1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0];
+        assert!(spectral_rolloff(&mag, 0.85) <= 3);
+    }
+
+    #[test]
+    fn test_zero_crossing_rate() {
+        assert!((zero_crossing_rate(&[1.0, -1.0, 1.0, -1.0, 1.0]) - 1.0).abs() < 1e-10);
+        assert_eq!(zero_crossing_rate(&[1.0, 1.0, 1.0]), 0.0);
+    }
+
+    #[test]
+    fn test_rms_energy() {
+        assert!((rms_energy(&[0.5_f32; 100]) - 0.5).abs() < 1e-6);
+        assert_eq!(rms_energy(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_autocorrelation_lag0() {
+        let signal: Vec<f32> = (0..100).map(|i| (i as f32 * 0.1).sin()).collect();
+        let ac = autocorrelation(&signal);
+        assert!((ac[0] - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_find_peaks() {
+        let data = vec![0.0, 1.0, 0.0, 0.5, 0.0, 2.0, 0.0];
+        assert_eq!(find_peaks(&data, 0.3, 1).len(), 3);
+        assert!(find_peaks(&data, 0.3, 3).len() <= 2);
+    }
+
+    #[test]
+    fn test_pearson_correlation() {
+        let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = vec![2.0, 4.0, 6.0, 8.0, 10.0];
+        assert!((pearson_correlation(&x, &y) - 1.0).abs() < 1e-10);
+        let y_neg = vec![10.0, 8.0, 6.0, 4.0, 2.0];
+        assert!((pearson_correlation(&x, &y_neg) - -1.0).abs() < 1e-10);
+    }
+}

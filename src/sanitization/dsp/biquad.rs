@@ -192,3 +192,75 @@ pub fn biquad_process(signal: &[f32], coeffs: &BiquadCoefficients) -> Vec<f32> {
 
     output
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sine_signal(freq: f32, sr: u32, len: usize) -> Vec<f32> {
+        (0..len)
+            .map(|i| (2.0 * std::f32::consts::PI * freq * i as f32 / sr as f32).sin())
+            .collect()
+    }
+
+    fn signal_rms(signal: &[f32]) -> f64 {
+        let sum_sq: f64 = signal.iter().map(|&s| (s as f64).powi(2)).sum();
+        (sum_sq / signal.len() as f64).sqrt()
+    }
+
+    #[test]
+    fn test_lowpass_attenuates_high_freq() {
+        let sr = 44100;
+        let low = sine_signal(200.0, sr, 4410);
+        let high = sine_signal(10000.0, sr, 4410);
+        let mixed: Vec<f32> = low.iter().zip(&high).map(|(a, b)| a + b).collect();
+
+        let coeffs = butterworth_lowpass(1000.0, sr);
+        let filtered = biquad_process(&mixed, &coeffs);
+
+        // After LP at 1kHz, high freq should be attenuated significantly
+        let high_only = biquad_process(&high, &coeffs);
+        assert!(signal_rms(&high_only) < signal_rms(&high) * 0.1);
+
+        // Low freq should pass through mostly unchanged
+        let low_only = biquad_process(&low, &coeffs);
+        assert!(signal_rms(&low_only) > signal_rms(&low) * 0.8);
+
+        // Output should exist
+        assert_eq!(filtered.len(), mixed.len());
+    }
+
+    #[test]
+    fn test_highpass_attenuates_low_freq() {
+        let sr = 44100;
+        let low = sine_signal(100.0, sr, 4410);
+        let coeffs = butterworth_highpass(5000.0, sr);
+        let filtered = biquad_process(&low, &coeffs);
+        assert!(signal_rms(&filtered) < signal_rms(&low) * 0.1);
+    }
+
+    #[test]
+    fn test_notch_removes_target_freq() {
+        let sr = 44100;
+        let target = sine_signal(1000.0, sr, 4410);
+        let coeffs = notch_filter(1000.0, 10.0, sr);
+        let filtered = biquad_process(&target, &coeffs);
+        assert!(signal_rms(&filtered) < signal_rms(&target) * 0.15);
+    }
+
+    #[test]
+    fn test_coefficients_finite() {
+        let coeffs = butterworth_lowpass(5000.0, 44100);
+        assert!(coeffs.b0.is_finite());
+        assert!(coeffs.b1.is_finite());
+        assert!(coeffs.b2.is_finite());
+        assert!(coeffs.a1.is_finite());
+        assert!(coeffs.a2.is_finite());
+    }
+
+    #[test]
+    fn test_empty_signal() {
+        let coeffs = butterworth_lowpass(1000.0, 44100);
+        assert!(biquad_process(&[], &coeffs).is_empty());
+    }
+}
