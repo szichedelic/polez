@@ -6,32 +6,58 @@ use rand::seq::SliceRandom;
 use std::collections::HashMap;
 
 /// Manages styled console output for all CLI display needs.
-pub struct ConsoleManager;
+///
+/// When `stderr_mode` is enabled (e.g. for `--json`), all output goes to
+/// stderr so that only machine-readable JSON appears on stdout.
+pub struct ConsoleManager {
+    stderr_mode: bool,
+}
 
 impl ConsoleManager {
-    /// Create a new console manager.
+    /// Create a new console manager that prints to stdout.
     pub fn new() -> Self {
-        Self
+        Self { stderr_mode: false }
+    }
+
+    /// Create a console manager that prints to stderr (for JSON mode).
+    pub fn stderr() -> Self {
+        Self { stderr_mode: true }
     }
 
     /// Print a green success message.
     pub fn success(&self, msg: &str) {
-        println!("{}", msg.green().bold());
+        if self.stderr_mode {
+            eprintln!("{}", msg.green().bold());
+        } else {
+            println!("{}", msg.green().bold());
+        }
     }
 
     /// Print a red error message.
     pub fn error(&self, msg: &str) {
-        println!("{}", msg.red().bold());
+        if self.stderr_mode {
+            eprintln!("{}", msg.red().bold());
+        } else {
+            println!("{}", msg.red().bold());
+        }
     }
 
     /// Print a yellow warning message.
     pub fn warning(&self, msg: &str) {
-        println!("{}", msg.yellow().bold());
+        if self.stderr_mode {
+            eprintln!("{}", msg.yellow().bold());
+        } else {
+            println!("{}", msg.yellow().bold());
+        }
     }
 
     /// Print a cyan informational message.
     pub fn info(&self, msg: &str) {
-        println!("{}", msg.cyan().bold());
+        if self.stderr_mode {
+            eprintln!("{}", msg.cyan().bold());
+        } else {
+            println!("{}", msg.cyan().bold());
+        }
     }
 
     /// Print a random themed quote in magenta italic.

@@ -184,7 +184,11 @@ fn main() {
         )
         .init();
 
-    let console = ConsoleManager::new();
+    let console = if json_mode {
+        ConsoleManager::stderr()
+    } else {
+        ConsoleManager::new()
+    };
     let banner = BannerManager::new();
 
     if !quiet_mode {
