@@ -53,7 +53,7 @@ pub async fn start_server(port: u16, no_open: bool) -> Result<()> {
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    println!("Polez GUI running at http://localhost:{port}");
+    tracing::info!("Polez GUI running at http://localhost:{port}");
 
     if !no_open {
         let _ = open::that(format!("http://localhost:{port}"));

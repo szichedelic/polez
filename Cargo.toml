@@ -43,6 +43,10 @@ indicatif = "0.17"
 console = "0.15"
 colored = "2"
 
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
 # Error handling
 anyhow = "1"
 thiserror = "2"

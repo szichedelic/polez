@@ -30,7 +30,7 @@ impl ConfigManager {
             match serde_yaml::from_str::<AppConfig>(&contents) {
                 Ok(loaded) => self.config = loaded,
                 Err(e) => {
-                    eprintln!("Warning: Config parse error ({e}), using defaults");
+                    tracing::warn!("Config parse error ({e}), using defaults");
                     self.config = default_config();
                 }
             }
