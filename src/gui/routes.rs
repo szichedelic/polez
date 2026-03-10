@@ -742,6 +742,7 @@ async fn clean_file(
             None,
             Vec::new(),
             None,
+            None,
         );
         pipeline.run(&input_path, &out)
     })

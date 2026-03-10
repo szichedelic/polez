@@ -74,9 +74,15 @@ pub fn load_audio(path: &Path) -> Result<(AudioBuffer, AudioFormat)> {
 }
 
 /// Save an AudioBuffer to a file in the specified format.
-pub fn save_audio(buffer: &AudioBuffer, path: &Path, format: AudioFormat) -> Result<()> {
+/// `bit_depth` only applies to WAV output (16, 24, or 32). Ignored for other formats.
+pub fn save_audio(
+    buffer: &AudioBuffer,
+    path: &Path,
+    format: AudioFormat,
+    bit_depth: Option<u16>,
+) -> Result<()> {
     match format {
-        AudioFormat::Wav => save_wav(buffer, path),
+        AudioFormat::Wav => save_wav(buffer, path, bit_depth.unwrap_or(24)),
         AudioFormat::Mp3 => save_mp3(buffer, path),
         AudioFormat::Flac => save_flac(buffer, path),
         AudioFormat::Ogg => save_ogg(buffer, path),
@@ -118,30 +124,63 @@ fn load_wav(path: &Path) -> Result<AudioBuffer> {
     ))
 }
 
-fn save_wav(buffer: &AudioBuffer, path: &Path) -> Result<()> {
-    let spec = hound::WavSpec {
-        channels: buffer.num_channels() as u16,
-        sample_rate: buffer.sample_rate,
-        bits_per_sample: 24,
-        sample_format: hound::SampleFormat::Int,
-    };
-
-    let mut writer = hound::WavWriter::create(path, spec)
-        .map_err(|e| PolezError::AudioIo(format!("Failed to create WAV: {e}")))?;
-
-    let max_val = (1u32 << 23) as f32; // 24-bit
+fn save_wav(buffer: &AudioBuffer, path: &Path, bit_depth: u16) -> Result<()> {
     let interleaved = buffer.to_interleaved();
-    for sample in interleaved {
-        let clamped = sample.clamp(-1.0, 1.0);
-        let int_sample = (clamped * max_val) as i32;
-        writer
-            .write_sample(int_sample)
-            .map_err(|e| PolezError::AudioIo(format!("WAV write error: {e}")))?;
-    }
 
-    writer
-        .finalize()
-        .map_err(|e| PolezError::AudioIo(format!("WAV finalize error: {e}")))?;
+    if bit_depth == 32 {
+        // 32-bit float output
+        let spec = hound::WavSpec {
+            channels: buffer.num_channels() as u16,
+            sample_rate: buffer.sample_rate,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut writer = hound::WavWriter::create(path, spec)
+            .map_err(|e| PolezError::AudioIo(format!("Failed to create WAV: {e}")))?;
+        for sample in interleaved {
+            writer
+                .write_sample(sample.clamp(-1.0, 1.0))
+                .map_err(|e| PolezError::AudioIo(format!("WAV write error: {e}")))?;
+        }
+        writer
+            .finalize()
+            .map_err(|e| PolezError::AudioIo(format!("WAV finalize error: {e}")))?;
+    } else {
+        // Integer output (16 or 24 bit)
+        let spec = hound::WavSpec {
+            channels: buffer.num_channels() as u16,
+            sample_rate: buffer.sample_rate,
+            bits_per_sample: bit_depth,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(path, spec)
+            .map_err(|e| PolezError::AudioIo(format!("Failed to create WAV: {e}")))?;
+
+        let max_val = (1u32 << (bit_depth - 1)) as f32;
+
+        // TPDF dithering for 16-bit to reduce quantization artifacts
+        let use_dither = bit_depth == 16;
+        let mut rng = rand::thread_rng();
+
+        for sample in interleaved {
+            let clamped = sample.clamp(-1.0, 1.0);
+            let scaled = if use_dither {
+                use rand::Rng;
+                // TPDF dither: sum of two uniform random values in [-0.5, 0.5]
+                let d1: f32 = rng.gen_range(-0.5..0.5);
+                let d2: f32 = rng.gen_range(-0.5..0.5);
+                (clamped * max_val + d1 + d2).round() as i32
+            } else {
+                (clamped * max_val) as i32
+            };
+            writer
+                .write_sample(scaled)
+                .map_err(|e| PolezError::AudioIo(format!("WAV write error: {e}")))?;
+        }
+        writer
+            .finalize()
+            .map_err(|e| PolezError::AudioIo(format!("WAV finalize error: {e}")))?;
+    }
 
     Ok(())
 }

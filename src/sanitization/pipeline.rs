@@ -44,6 +44,7 @@ pub struct SanitizationPipeline {
     output_format: Option<AudioFormat>,
     freq_ranges: Vec<(f64, f64)>,
     target_sample_rate: Option<u32>,
+    bit_depth: Option<u16>,
 }
 
 impl SanitizationPipeline {
@@ -57,6 +58,7 @@ impl SanitizationPipeline {
         output_format: Option<AudioFormat>,
         freq_ranges: Vec<(f64, f64)>,
         target_sample_rate: Option<u32>,
+        bit_depth: Option<u16>,
     ) -> Self {
         Self {
             mode,
@@ -67,6 +69,7 @@ impl SanitizationPipeline {
             output_format,
             freq_ranges,
             target_sample_rate,
+            bit_depth,
         }
     }
 
@@ -148,7 +151,7 @@ impl SanitizationPipeline {
         } else {
             audio::AudioFormat::Wav
         };
-        audio::save_audio(&buffer, output, out_format)?;
+        audio::save_audio(&buffer, output, out_format, self.bit_depth)?;
 
         let elapsed = start.elapsed().as_secs_f64();
 

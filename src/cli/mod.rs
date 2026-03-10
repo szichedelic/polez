@@ -91,6 +91,10 @@ Examples:
         #[arg(long)]
         sample_rate: Option<u32>,
 
+        /// WAV output bit depth (16, 24, or 32). 16-bit applies TPDF dithering, 32-bit uses float.
+        #[arg(long, value_parser = clap::value_parser!(u16).range(16..=32))]
+        bit_depth: Option<u16>,
+
         /// Target specific frequency ranges for cleaning (Hz), e.g. --freq-range 15000-22000
         /// Multiple ranges supported. Default: full spectrum.
         #[arg(long, value_parser = parse_freq_range)]

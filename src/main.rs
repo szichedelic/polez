@@ -227,6 +227,7 @@ fn run_command(
             report,
             audit_log,
             sample_rate,
+            bit_depth,
             freq_range,
             flags,
             fp_flags,
@@ -243,6 +244,7 @@ fn run_command(
             audit_log.as_deref(),
             format,
             sample_rate,
+            bit_depth,
             freq_range,
             flags.into(),
             fp_flags.into(),
@@ -354,6 +356,7 @@ fn cmd_clean(
     audit_log: Option<&Path>,
     format: FormatChoice,
     target_sample_rate: Option<u32>,
+    bit_depth: Option<u16>,
     freq_ranges: Vec<(f64, f64)>,
     flags: config::AdvancedFlags,
     fp_config: config::FingerprintRemovalConfig,
@@ -377,6 +380,14 @@ fn cmd_clean(
                     .map(|r| r.to_string())
                     .collect::<Vec<_>>()
                     .join(", ")
+            )));
+        }
+    }
+
+    if let Some(bd) = bit_depth {
+        if !matches!(bd, 16 | 24 | 32) {
+            return Err(error::PolezError::AudioIo(format!(
+                "Invalid bit depth {bd}. Supported: 16, 24, 32"
             )));
         }
     }
@@ -503,6 +514,7 @@ fn cmd_clean(
         out_format,
         freq_ranges,
         target_sample_rate,
+        bit_depth,
     );
 
     if !json_mode {
@@ -757,6 +769,7 @@ fn cmd_sweep(
                     fp_config.clone(),
                     out_format,
                     Vec::new(),
+                    None,
                     None,
                 );
                 let result = pipeline
