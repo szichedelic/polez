@@ -217,6 +217,7 @@ fn run_command(
             input_file,
             output,
             paranoid,
+            paranoid_passes,
             verify,
             backup,
             dry_run,
@@ -229,6 +230,7 @@ fn run_command(
             &input_file,
             output.as_deref(),
             paranoid,
+            paranoid_passes,
             verify,
             backup,
             dry_run,
@@ -335,6 +337,7 @@ fn cmd_clean(
     input_file: &Path,
     output: Option<&Path>,
     paranoid: bool,
+    paranoid_passes: u32,
     verify: bool,
     backup: bool,
     dry_run: bool,
@@ -458,7 +461,17 @@ fn cmd_clean(
 
     let mode = SanitizationPipeline::mode_from_config(&config_mgr.config);
     let audit_flags = flags.clone();
-    let pipeline = SanitizationPipeline::new(mode, paranoid, flags, fp_config, out_format);
+    if !paranoid && paranoid_passes != 2 {
+        console.warning("--paranoid-passes has no effect without --paranoid");
+    }
+    let pipeline = SanitizationPipeline::new(
+        mode,
+        paranoid,
+        paranoid_passes,
+        flags,
+        fp_config,
+        out_format,
+    );
 
     if !json_mode {
         banner.show_processing_banner();
@@ -707,6 +720,7 @@ fn cmd_sweep(
                 let pipeline = SanitizationPipeline::new(
                     mode,
                     paranoid,
+                    2,
                     flags.clone(),
                     fp_config.clone(),
                     out_format,

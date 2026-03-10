@@ -38,6 +38,7 @@ pub struct SanitizationResult {
 pub struct SanitizationPipeline {
     mode: SanitizationMode,
     paranoid: bool,
+    paranoid_passes: u32,
     flags: AdvancedFlags,
     fp_config: FingerprintRemovalConfig,
     output_format: Option<AudioFormat>,
@@ -47,6 +48,7 @@ impl SanitizationPipeline {
     pub fn new(
         mode: SanitizationMode,
         paranoid: bool,
+        paranoid_passes: u32,
         flags: AdvancedFlags,
         fp_config: FingerprintRemovalConfig,
         output_format: Option<AudioFormat>,
@@ -54,6 +56,7 @@ impl SanitizationPipeline {
         Self {
             mode,
             paranoid,
+            paranoid_passes,
             flags,
             fp_config,
             output_format,
@@ -149,7 +152,7 @@ impl SanitizationPipeline {
         };
 
         if self.paranoid && self.mode != SanitizationMode::Fast {
-            for _pass in 0..2 {
+            for _pass in 0..self.paranoid_passes {
                 SpectralCleaner::clean(buffer, self.paranoid, &self.flags)?;
             }
         }

@@ -37,6 +37,7 @@ Examples:
   polez clean track.wav                         Clean with default settings
   polez clean track.mp3 -o clean.mp3 --verify   Clean and verify effectiveness
   polez clean track.wav --paranoid --backup      Maximum destruction with backup
+  polez clean track.wav --paranoid --paranoid-passes 5  Custom pass count
   polez clean track.wav --dry-run --report r.json  Analyze without cleaning
   polez clean track.mp3 -f wav                    Convert output to WAV format
   polez --json clean track.wav                   Machine-readable JSON output")]
@@ -51,6 +52,10 @@ Examples:
         /// Maximum destruction mode - multiple passes with aggressive cleaning
         #[arg(long)]
         paranoid: bool,
+
+        /// Number of additional paranoid passes (1-10, default: 2)
+        #[arg(long, default_value = "2", value_parser = clap::value_parser!(u32).range(1..=10))]
+        paranoid_passes: u32,
 
         /// Verify watermark removal effectiveness
         #[arg(long)]
