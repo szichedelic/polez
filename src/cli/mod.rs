@@ -346,6 +346,7 @@ pub enum FormatChoice {
     Mp3,
     Wav,
     Flac,
+    Ogg,
     Aac,
 }
 

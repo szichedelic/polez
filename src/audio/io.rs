@@ -8,6 +8,7 @@ pub enum AudioFormat {
     Wav,
     Mp3,
     Flac,
+    Ogg,
     Aac,
 }
 
@@ -17,13 +18,17 @@ impl AudioFormat {
             AudioFormat::Wav => "wav",
             AudioFormat::Mp3 => "mp3",
             AudioFormat::Flac => "flac",
+            AudioFormat::Ogg => "ogg",
             AudioFormat::Aac => "m4a",
         }
     }
 
     /// Whether this format has an encoder available for output.
     pub fn has_encoder(&self) -> bool {
-        matches!(self, AudioFormat::Wav | AudioFormat::Mp3)
+        matches!(
+            self,
+            AudioFormat::Wav | AudioFormat::Mp3 | AudioFormat::Flac | AudioFormat::Ogg
+        )
     }
 }
 
@@ -33,6 +38,7 @@ impl std::fmt::Display for AudioFormat {
             AudioFormat::Wav => write!(f, "WAV"),
             AudioFormat::Mp3 => write!(f, "MP3"),
             AudioFormat::Flac => write!(f, "FLAC"),
+            AudioFormat::Ogg => write!(f, "OGG"),
             AudioFormat::Aac => write!(f, "AAC"),
         }
     }
@@ -49,6 +55,7 @@ pub fn detect_format(path: &Path) -> Result<AudioFormat> {
         Some("wav") => Ok(AudioFormat::Wav),
         Some("mp3") => Ok(AudioFormat::Mp3),
         Some("flac") => Ok(AudioFormat::Flac),
+        Some("ogg") | Some("oga") => Ok(AudioFormat::Ogg),
         Some("aac") | Some("m4a") => Ok(AudioFormat::Aac),
         Some(ext) => Err(PolezError::UnsupportedFormat(ext.to_string())),
         None => Err(PolezError::UnsupportedFormat("no extension".to_string())),
@@ -60,21 +67,22 @@ pub fn load_audio(path: &Path) -> Result<(AudioBuffer, AudioFormat)> {
     let format = detect_format(path)?;
     match format {
         AudioFormat::Wav => load_wav(path).map(|buf| (buf, format)),
-        AudioFormat::Mp3 | AudioFormat::Flac | AudioFormat::Aac => {
+        AudioFormat::Mp3 | AudioFormat::Flac | AudioFormat::Ogg | AudioFormat::Aac => {
             load_symphonia(path, format).map(|buf| (buf, format))
         }
     }
 }
 
 /// Save an AudioBuffer to a file in the specified format.
-/// Note: FLAC and AAC encoding are not supported; use WAV or MP3 instead.
 pub fn save_audio(buffer: &AudioBuffer, path: &Path, format: AudioFormat) -> Result<()> {
     match format {
         AudioFormat::Wav => save_wav(buffer, path),
         AudioFormat::Mp3 => save_mp3(buffer, path),
-        AudioFormat::Flac | AudioFormat::Aac => Err(PolezError::UnsupportedFormat(format!(
-            "{format} encoding is not supported; use WAV or MP3 output format"
-        ))),
+        AudioFormat::Flac => save_flac(buffer, path),
+        AudioFormat::Ogg => save_ogg(buffer, path),
+        AudioFormat::Aac => Err(PolezError::UnsupportedFormat(
+            "AAC encoding is not supported; use wav, mp3, flac, or ogg".into(),
+        )),
     }
 }
 
@@ -268,6 +276,102 @@ fn save_mp3(buffer: &AudioBuffer, path: &Path) -> Result<()> {
 
     std::fs::write(path, &mp3_out)
         .map_err(|e| PolezError::AudioIo(format!("Failed to write MP3: {e}")))?;
+
+    Ok(())
+}
+
+// --- FLAC ---
+
+fn save_flac(buffer: &AudioBuffer, path: &Path) -> Result<()> {
+    use flacenc::bitsink::ByteSink;
+    use flacenc::component::BitRepr;
+    use flacenc::error::Verify;
+
+    let channels = buffer.num_channels();
+    let bits_per_sample = 16_u32;
+    let sample_rate = buffer.sample_rate;
+
+    let config = flacenc::config::Encoder::default()
+        .into_verified()
+        .map_err(|e| PolezError::AudioIo(format!("FLAC encoder config error: {e:?}")))?;
+
+    // Convert f32 [-1,1] to i32 (16-bit range) interleaved
+    let interleaved = buffer.to_interleaved();
+    let max_val = (1u32 << (bits_per_sample - 1)) as f32;
+    let samples_i32: Vec<i32> = interleaved
+        .iter()
+        .map(|&s| (s.clamp(-1.0, 1.0) * (max_val - 1.0)) as i32)
+        .collect();
+
+    let source = flacenc::source::MemSource::from_samples(
+        &samples_i32,
+        channels,
+        bits_per_sample as usize,
+        sample_rate as usize,
+    );
+
+    let flac_stream = flacenc::encode_with_fixed_block_size(&config, source, config.block_size)
+        .map_err(|e| PolezError::AudioIo(format!("FLAC encode error: {e}")))?;
+
+    let mut sink = ByteSink::new();
+    flac_stream
+        .write(&mut sink)
+        .map_err(|e| PolezError::AudioIo(format!("FLAC write error: {e:?}")))?;
+
+    std::fs::write(path, sink.as_slice())
+        .map_err(|e| PolezError::AudioIo(format!("Failed to write FLAC: {e}")))?;
+
+    Ok(())
+}
+
+// --- OGG Vorbis ---
+
+fn save_ogg(buffer: &AudioBuffer, path: &Path) -> Result<()> {
+    use std::io::BufWriter;
+    use std::num::{NonZeroU32, NonZeroU8};
+    use vorbis_rs::VorbisEncoderBuilder;
+
+    let channels = buffer.num_channels();
+    let sample_rate = buffer.sample_rate;
+
+    let file = std::fs::File::create(path)
+        .map_err(|e| PolezError::AudioIo(format!("Failed to create OGG file: {e}")))?;
+    let writer = BufWriter::new(file);
+
+    let mut encoder = VorbisEncoderBuilder::new(
+        NonZeroU32::new(sample_rate).unwrap_or(NonZeroU32::new(44100).unwrap()),
+        NonZeroU8::new(channels as u8).unwrap_or(NonZeroU8::new(1).unwrap()),
+        writer,
+    )
+    .map_err(|e| PolezError::AudioIo(format!("OGG encoder init error: {e}")))?
+    .build()
+    .map_err(|e| PolezError::AudioIo(format!("OGG encoder build error: {e}")))?;
+
+    // VorbisEncoder expects audio blocks as &[Vec<f32>] where outer = channels
+    let block_size = 4096;
+    let total_samples = buffer.channel(0).len();
+
+    for start in (0..total_samples).step_by(block_size) {
+        let end = (start + block_size).min(total_samples);
+        let block: Vec<Vec<f32>> = (0..channels)
+            .map(|ch| {
+                buffer
+                    .channel(ch)
+                    .iter()
+                    .skip(start)
+                    .take(end - start)
+                    .copied()
+                    .collect()
+            })
+            .collect();
+        encoder
+            .encode_audio_block(block)
+            .map_err(|e| PolezError::AudioIo(format!("OGG encode error: {e}")))?;
+    }
+
+    encoder
+        .finish()
+        .map_err(|e| PolezError::AudioIo(format!("OGG finalize error: {e}")))?;
 
     Ok(())
 }

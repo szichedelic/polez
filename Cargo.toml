@@ -16,6 +16,8 @@ lofty = "0.21"
 hound = "3.5"
 symphonia = { version = "0.5", features = ["mp3", "wav", "pcm", "isomp4", "aac", "flac"] }
 mp3lame-encoder = "0.2"
+flacenc = { version = "0.5", default-features = false }
+vorbis_rs = "0.5"
 
 # DSP / FFT
 rustfft = "6"

@@ -1413,7 +1413,9 @@ fn cmd_config(action: Option<ConfigAction>, console: &ConsoleManager) -> error::
                 FormatChoice::Preserve => config::OutputFormat::Preserve,
                 FormatChoice::Mp3 => config::OutputFormat::Mp3,
                 FormatChoice::Wav => config::OutputFormat::Wav,
-                FormatChoice::Flac | FormatChoice::Aac => config::OutputFormat::Preserve,
+                FormatChoice::Flac | FormatChoice::Ogg | FormatChoice::Aac => {
+                    config::OutputFormat::Preserve
+                }
             };
             preset_config.backup_originals = backup;
             preset_config.verification.auto_verify = verify;
@@ -1452,11 +1454,10 @@ fn resolve_output_format(format: FormatChoice) -> error::Result<Option<audio::Au
         FormatChoice::Preserve => Ok(None),
         FormatChoice::Mp3 => Ok(Some(audio::AudioFormat::Mp3)),
         FormatChoice::Wav => Ok(Some(audio::AudioFormat::Wav)),
-        FormatChoice::Flac => Err(error::PolezError::UnsupportedFormat(
-            "FLAC encoding is not yet supported; use wav or mp3".into(),
-        )),
+        FormatChoice::Flac => Ok(Some(audio::AudioFormat::Flac)),
+        FormatChoice::Ogg => Ok(Some(audio::AudioFormat::Ogg)),
         FormatChoice::Aac => Err(error::PolezError::UnsupportedFormat(
-            "AAC encoding is not supported; use wav or mp3".into(),
+            "AAC encoding is not supported; use wav, mp3, flac, or ogg".into(),
         )),
     }
 }
