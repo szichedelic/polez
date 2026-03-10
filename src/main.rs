@@ -226,6 +226,7 @@ fn run_command(
             format,
             report,
             audit_log,
+            freq_range,
             flags,
             fp_flags,
         } => cmd_clean(
@@ -240,6 +241,7 @@ fn run_command(
             report.as_deref(),
             audit_log.as_deref(),
             format,
+            freq_range,
             flags.into(),
             fp_flags.into(),
             json_mode,
@@ -349,6 +351,7 @@ fn cmd_clean(
     report: Option<&Path>,
     audit_log: Option<&Path>,
     format: FormatChoice,
+    freq_ranges: Vec<(f64, f64)>,
     flags: config::AdvancedFlags,
     fp_config: config::FingerprintRemovalConfig,
     json_mode: bool,
@@ -479,6 +482,7 @@ fn cmd_clean(
         flags,
         fp_config,
         out_format,
+        freq_ranges,
     );
 
     if !json_mode {
@@ -732,6 +736,7 @@ fn cmd_sweep(
                     flags.clone(),
                     fp_config.clone(),
                     out_format,
+                    Vec::new(),
                 );
                 let result = pipeline
                     .run(file, &output_file)

@@ -27,10 +27,15 @@ impl SpectralCleaner {
     /// shared spectrogram, then reconstructs via a single ISTFT. This avoids
     /// redundant FFT work across periodic disruption, spectral smoothing, and
     /// spread-spectrum attenuation.
+    /// Run all spectral cleaning methods. Returns (patterns_found, patterns_suppressed).
+    ///
+    /// When `freq_ranges` is non-empty, only bins within those Hz ranges are modified.
+    /// An empty `freq_ranges` means full-spectrum cleaning (default behavior).
     pub fn clean(
         buffer: &mut AudioBuffer,
         paranoid: bool,
         _flags: &AdvancedFlags,
+        freq_ranges: &[(f64, f64)],
     ) -> Result<(usize, usize)> {
         let mut found = 0;
         let mut suppressed = 0;
@@ -59,13 +64,28 @@ impl SpectralCleaner {
                 let freq_resolution = sr as f64 / nperseg as f64;
                 let high_freq_start = (15000.0 / freq_resolution) as usize;
 
-                let (f2, s2) =
-                    apply_periodic_disruption(&mut spectrogram, high_freq_start, paranoid);
+                let (f2, s2) = apply_periodic_disruption(
+                    &mut spectrogram,
+                    high_freq_start,
+                    paranoid,
+                    freq_ranges,
+                    freq_resolution,
+                );
                 found += f2;
                 suppressed += s2;
 
-                apply_spectral_smoothing(&mut spectrogram, high_freq_start);
-                apply_spread_spectrum_attenuation(&mut spectrogram, high_freq_start);
+                apply_spectral_smoothing(
+                    &mut spectrogram,
+                    high_freq_start,
+                    freq_ranges,
+                    freq_resolution,
+                );
+                apply_spread_spectrum_attenuation(
+                    &mut spectrogram,
+                    high_freq_start,
+                    freq_ranges,
+                    freq_resolution,
+                );
 
                 // Single ISTFT reconstruction
                 let reconstructed = stft::istft(&spectrogram, nperseg, noverlap, orig_len);
@@ -125,6 +145,16 @@ impl SpectralCleaner {
 
         Ok(total_peaks)
     }
+}
+
+/// Check if a frequency bin falls within the user-specified frequency ranges.
+/// If no ranges are specified (empty slice), all bins are in range (full spectrum).
+fn bin_in_range(bin: usize, freq_resolution: f64, freq_ranges: &[(f64, f64)]) -> bool {
+    if freq_ranges.is_empty() {
+        return true;
+    }
+    let freq = bin as f64 * freq_resolution;
+    freq_ranges.iter().any(|&(lo, hi)| freq >= lo && freq <= hi)
 }
 
 /// Detect and count watermarks in known frequency bands.
@@ -193,13 +223,18 @@ fn apply_periodic_disruption(
     spectrogram: &mut [Vec<Complex<f32>>],
     high_freq_start: usize,
     paranoid: bool,
+    freq_ranges: &[(f64, f64)],
+    freq_resolution: f64,
 ) -> (usize, usize) {
     let mut rng = rand::thread_rng();
     let phase_noise = if paranoid { 0.05 } else { 0.02 };
     let mut found = 0;
 
     for frame in spectrogram.iter_mut() {
-        for val in frame.iter_mut().skip(high_freq_start) {
+        for (bin, val) in frame.iter_mut().enumerate().skip(high_freq_start) {
+            if !bin_in_range(bin, freq_resolution, freq_ranges) {
+                continue;
+            }
             let mag = val.norm();
             let phase = val.arg();
             let new_phase = phase + rng.gen_range(-phase_noise..phase_noise) as f32;
@@ -217,7 +252,12 @@ fn apply_periodic_disruption(
 /// Only smooths bins above 15kHz where watermarks live. Uses magnitude-only
 /// averaging (preserving original phase) to avoid the massive signal
 /// cancellation that complex-domain averaging causes.
-fn apply_spectral_smoothing(spectrogram: &mut [Vec<Complex<f32>>], high_freq_start: usize) {
+fn apply_spectral_smoothing(
+    spectrogram: &mut [Vec<Complex<f32>>],
+    high_freq_start: usize,
+    freq_ranges: &[(f64, f64)],
+    freq_resolution: f64,
+) {
     let window = 5;
     let half = window / 2;
 
@@ -225,6 +265,9 @@ fn apply_spectral_smoothing(spectrogram: &mut [Vec<Complex<f32>>], high_freq_sta
         let original: Vec<Complex<f32>> = frame.clone();
         let start = high_freq_start.max(half);
         for i in start..frame.len().saturating_sub(half) {
+            if !bin_in_range(i, freq_resolution, freq_ranges) {
+                continue;
+            }
             let avg_mag = original[i - half..=i + half]
                 .iter()
                 .map(|c| c.norm())
@@ -259,9 +302,14 @@ fn adaptive_noise_shaping(channel: &mut [f32], sr: u32, paranoid: bool) {
 fn apply_spread_spectrum_attenuation(
     spectrogram: &mut [Vec<Complex<f32>>],
     high_freq_start: usize,
+    freq_ranges: &[(f64, f64)],
+    freq_resolution: f64,
 ) {
     for frame in spectrogram.iter_mut() {
-        for val in frame.iter_mut().skip(high_freq_start) {
+        for (bin, val) in frame.iter_mut().enumerate().skip(high_freq_start) {
+            if !bin_in_range(bin, freq_resolution, freq_ranges) {
+                continue;
+            }
             *val *= 0.8;
         }
     }

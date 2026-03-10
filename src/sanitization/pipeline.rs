@@ -42,6 +42,7 @@ pub struct SanitizationPipeline {
     flags: AdvancedFlags,
     fp_config: FingerprintRemovalConfig,
     output_format: Option<AudioFormat>,
+    freq_ranges: Vec<(f64, f64)>,
 }
 
 impl SanitizationPipeline {
@@ -52,6 +53,7 @@ impl SanitizationPipeline {
         flags: AdvancedFlags,
         fp_config: FingerprintRemovalConfig,
         output_format: Option<AudioFormat>,
+        freq_ranges: Vec<(f64, f64)>,
     ) -> Self {
         Self {
             mode,
@@ -60,6 +62,7 @@ impl SanitizationPipeline {
             flags,
             fp_config,
             output_format,
+            freq_ranges,
         }
     }
 
@@ -153,7 +156,7 @@ impl SanitizationPipeline {
 
         if self.paranoid && self.mode != SanitizationMode::Fast {
             for _pass in 0..self.paranoid_passes {
-                SpectralCleaner::clean(buffer, self.paranoid, &self.flags)?;
+                SpectralCleaner::clean(buffer, self.paranoid, &self.flags, &self.freq_ranges)?;
             }
         }
 
@@ -192,20 +195,23 @@ impl SanitizationPipeline {
     }
 
     fn run_standard(&self, buffer: &mut AudioBuffer) -> Result<(usize, usize)> {
-        let (found, suppressed) = SpectralCleaner::clean(buffer, self.paranoid, &self.flags)?;
+        let (found, suppressed) =
+            SpectralCleaner::clean(buffer, self.paranoid, &self.flags, &self.freq_ranges)?;
         FingerprintRemover::remove(buffer, self.paranoid, &self.fp_config)?;
         Ok((found, suppressed))
     }
 
     fn run_preserving(&self, buffer: &mut AudioBuffer) -> Result<(usize, usize)> {
-        let (found, suppressed) = SpectralCleaner::clean(buffer, self.paranoid, &self.flags)?;
+        let (found, suppressed) =
+            SpectralCleaner::clean(buffer, self.paranoid, &self.flags, &self.freq_ranges)?;
         FingerprintRemover::remove(buffer, self.paranoid, &self.fp_config)?;
         StealthOps::apply(buffer, &self.flags, self.paranoid)?;
         Ok((found, suppressed))
     }
 
     fn run_aggressive(&self, buffer: &mut AudioBuffer) -> Result<(usize, usize)> {
-        let (found, suppressed) = SpectralCleaner::clean(buffer, true, &self.flags)?;
+        let (found, suppressed) =
+            SpectralCleaner::clean(buffer, true, &self.flags, &self.freq_ranges)?;
         FingerprintRemover::remove(buffer, true, &self.fp_config)?;
         StealthOps::apply(buffer, &self.flags, true)?;
         Ok((found, suppressed))

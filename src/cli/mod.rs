@@ -87,6 +87,11 @@ Examples:
         #[arg(long)]
         audit_log: Option<PathBuf>,
 
+        /// Target specific frequency ranges for cleaning (Hz), e.g. --freq-range 15000-22000
+        /// Multiple ranges supported. Default: full spectrum.
+        #[arg(long, value_parser = parse_freq_range)]
+        freq_range: Vec<(f64, f64)>,
+
         #[command(flatten)]
         flags: AdvancedFlagsCli,
 
@@ -358,4 +363,31 @@ pub enum QualityChoice {
     Medium,
     High,
     Maximum,
+}
+
+/// Parse a frequency range string like "15000-22000" into (low, high) Hz.
+fn parse_freq_range(s: &str) -> std::result::Result<(f64, f64), String> {
+    let parts: Vec<&str> = s.split('-').collect();
+    if parts.len() != 2 {
+        return Err(format!(
+            "Invalid frequency range '{s}': expected format LOW-HIGH (e.g. 15000-22000)"
+        ));
+    }
+    let low: f64 = parts[0]
+        .trim()
+        .parse()
+        .map_err(|_| format!("Invalid low frequency: '{}'", parts[0]))?;
+    let high: f64 = parts[1]
+        .trim()
+        .parse()
+        .map_err(|_| format!("Invalid high frequency: '{}'", parts[1]))?;
+    if low >= high {
+        return Err(format!(
+            "Low frequency ({low}) must be less than high frequency ({high})"
+        ));
+    }
+    if low < 0.0 {
+        return Err("Frequency cannot be negative".to_string());
+    }
+    Ok((low, high))
 }

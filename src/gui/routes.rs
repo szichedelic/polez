@@ -733,8 +733,15 @@ async fn clean_file(
             }
         }
 
-        let pipeline =
-            SanitizationPipeline::new(mode, false, 2, flags, cfg.fingerprint_removal, None);
+        let pipeline = SanitizationPipeline::new(
+            mode,
+            false,
+            2,
+            flags,
+            cfg.fingerprint_removal,
+            None,
+            Vec::new(),
+        );
         pipeline.run(&input_path, &out)
     })
     .await
