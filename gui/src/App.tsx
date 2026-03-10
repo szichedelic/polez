@@ -7,6 +7,7 @@ import { DetectionPanel } from './components/DetectionPanel';
 import { BitPlaneViewer } from './components/BitPlaneViewer';
 import { CleanPanel } from './components/CleanPanel';
 import { AudioPlayer } from './components/AudioPlayer';
+import { ComparisonTimeline } from './components/ComparisonTimeline';
 
 function App() {
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
@@ -32,6 +33,7 @@ function App() {
         </div>
 
         <CleanPanel fileLoaded={!!fileInfo} onCleaned={() => setHasCleaned(true)} />
+        <ComparisonTimeline fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
       </div>
     </div>
   );
