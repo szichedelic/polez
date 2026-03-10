@@ -23,6 +23,7 @@ use sha2::{Digest, Sha256};
 use cli::{Cli, Commands, ConfigAction, FormatChoice};
 use config::ConfigManager;
 use detection::{MetadataScanner, StatisticalAnalyzer, WatermarkDetector};
+use sanitization::pipeline::SanitizationMode;
 use sanitization::SanitizationPipeline;
 use ui::banners::BannerManager;
 use ui::console::{
@@ -218,6 +219,7 @@ fn run_command(
             output,
             paranoid,
             paranoid_passes,
+            quality,
             verify,
             backup,
             dry_run,
@@ -231,6 +233,7 @@ fn run_command(
             output.as_deref(),
             paranoid,
             paranoid_passes,
+            quality,
             verify,
             backup,
             dry_run,
@@ -338,6 +341,7 @@ fn cmd_clean(
     output: Option<&Path>,
     paranoid: bool,
     paranoid_passes: u32,
+    quality: Option<u32>,
     verify: bool,
     backup: bool,
     dry_run: bool,
@@ -459,7 +463,10 @@ fn cmd_clean(
         return Ok(());
     }
 
-    let mode = SanitizationPipeline::mode_from_config(&config_mgr.config);
+    let mode = match quality {
+        Some(q) => quality_to_mode(q),
+        None => SanitizationPipeline::mode_from_config(&config_mgr.config),
+    };
     let audit_flags = flags.clone();
     if !paranoid && paranoid_passes != 2 {
         console.warning("--paranoid-passes has no effect without --paranoid");
@@ -1316,6 +1323,15 @@ fn cmd_config(action: Option<ConfigAction>, console: &ConsoleManager) -> error::
             console.success("Configuration reset to defaults");
             Ok(())
         }
+    }
+}
+
+fn quality_to_mode(q: u32) -> SanitizationMode {
+    match q {
+        0..=24 => SanitizationMode::Fast,
+        25..=49 => SanitizationMode::Standard,
+        50..=74 => SanitizationMode::Preserving,
+        _ => SanitizationMode::Aggressive,
     }
 }
 
