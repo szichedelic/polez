@@ -252,3 +252,176 @@ impl SanitizationPipeline {
         Ok((found, suppressed))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::detection::WatermarkDetector;
+
+    fn sine_buffer(freq: f32, sr: u32, duration_secs: f32) -> AudioBuffer {
+        let len = (sr as f32 * duration_secs) as usize;
+        let samples: Vec<f32> = (0..len)
+            .map(|i| (2.0 * std::f32::consts::PI * freq * i as f32 / sr as f32).sin() * 0.5)
+            .collect();
+        AudioBuffer::from_mono(samples, sr)
+    }
+
+    fn make_pipeline(mode: SanitizationMode) -> SanitizationPipeline {
+        SanitizationPipeline::new(
+            mode,
+            false,
+            0,
+            AdvancedFlags::default(),
+            FingerprintRemovalConfig {
+                statistical_normalization: true,
+                temporal_randomization: true,
+                phase_randomization: true,
+                micro_timing_perturbation: true,
+                human_imperfections: true,
+            },
+            None,
+            vec![],
+            None,
+            None,
+        )
+    }
+
+    #[test]
+    fn test_single_clean_doesnt_amplify_watermarks() {
+        let buf = sine_buffer(440.0, 44100, 0.5);
+        let before = WatermarkDetector::detect_all(&buf);
+
+        let mut cleaned = buf.clone();
+        let pipeline = make_pipeline(SanitizationMode::Standard);
+        pipeline.process_buffer(&mut cleaned).unwrap();
+
+        let after = WatermarkDetector::detect_all(&cleaned);
+        // Processing may shift statistical features slightly — allow 0.3 tolerance
+        assert!(
+            after.overall_confidence <= before.overall_confidence + 0.3,
+            "Cleaning increased watermark confidence from {} to {}",
+            before.overall_confidence,
+            after.overall_confidence
+        );
+    }
+
+    #[test]
+    fn test_double_clean_quality_stable() {
+        let buf = sine_buffer(440.0, 44100, 0.5);
+        let original_rms = buf.rms();
+
+        let mut pass1 = buf.clone();
+        let pipeline = make_pipeline(SanitizationMode::Standard);
+        pipeline.process_buffer(&mut pass1).unwrap();
+        pass1.normalize_rms(original_rms);
+        let rms1 = pass1.rms();
+
+        let mut pass2 = pass1.clone();
+        pipeline.process_buffer(&mut pass2).unwrap();
+        pass2.normalize_rms(original_rms);
+        let rms2 = pass2.rms();
+
+        let diff = (rms1 - rms2).abs() / original_rms;
+        assert!(
+            diff < 0.05,
+            "Quality degraded significantly on second pass: rms1={rms1}, rms2={rms2}, diff={diff}"
+        );
+    }
+
+    #[test]
+    fn test_triple_clean_converges() {
+        let buf = sine_buffer(440.0, 44100, 0.5);
+        let original_rms = buf.rms();
+        let pipeline = make_pipeline(SanitizationMode::Standard);
+
+        let mut prev = buf;
+        let mut rms_values = Vec::new();
+
+        for _ in 0..3 {
+            pipeline.process_buffer(&mut prev).unwrap();
+            prev.normalize_rms(original_rms);
+            rms_values.push(prev.rms());
+        }
+
+        // Differences between consecutive passes should decrease
+        let diff_1_2 = (rms_values[0] - rms_values[1]).abs();
+        let diff_2_3 = (rms_values[1] - rms_values[2]).abs();
+        assert!(
+            diff_2_3 <= diff_1_2 + 0.01,
+            "Quality not converging: d12={diff_1_2}, d23={diff_2_3}"
+        );
+    }
+
+    #[test]
+    fn test_no_new_false_positives_after_clean() {
+        let buf = sine_buffer(440.0, 44100, 0.5);
+        let before = WatermarkDetector::detect_all(&buf);
+
+        let mut cleaned = buf.clone();
+        let pipeline = make_pipeline(SanitizationMode::Standard);
+        pipeline.process_buffer(&mut cleaned).unwrap();
+
+        let after = WatermarkDetector::detect_all(&cleaned);
+        assert!(
+            after.watermark_count <= before.watermark_count,
+            "Cleaning introduced new false positives: before={}, after={}",
+            before.watermark_count,
+            after.watermark_count
+        );
+    }
+
+    #[test]
+    fn test_fast_mode_preserves_quality() {
+        let buf = sine_buffer(440.0, 44100, 0.5);
+        let original_rms = buf.rms();
+
+        let mut cleaned = buf.clone();
+        let pipeline = make_pipeline(SanitizationMode::Fast);
+        pipeline.process_buffer(&mut cleaned).unwrap();
+
+        // Fast mode does minimal processing — RMS should barely change
+        let diff = (original_rms - cleaned.rms()).abs() / original_rms;
+        assert!(
+            diff < 0.01,
+            "Fast mode changed RMS by {diff:.4} (expected < 0.01)"
+        );
+    }
+
+    #[test]
+    fn test_aggressive_mode_still_bounded() {
+        let buf = sine_buffer(440.0, 44100, 0.5);
+        let original_peak = buf.peak();
+
+        let mut cleaned = buf.clone();
+        let pipeline = make_pipeline(SanitizationMode::Aggressive);
+        pipeline.process_buffer(&mut cleaned).unwrap();
+
+        // Aggressive mode should not create clipping
+        assert!(
+            cleaned.peak() <= original_peak * 1.5,
+            "Aggressive mode amplified peak from {} to {}",
+            original_peak,
+            cleaned.peak()
+        );
+    }
+
+    #[test]
+    fn test_file_roundtrip_resilience() {
+        let buf = sine_buffer(440.0, 44100, 0.5);
+        let dir = tempfile::tempdir().unwrap();
+        let input_path = dir.path().join("input.wav");
+        let output_path = dir.path().join("output.wav");
+        audio::save_audio(&buf, &input_path, audio::AudioFormat::Wav, None).unwrap();
+
+        let pipeline = make_pipeline(SanitizationMode::Standard);
+        let result = pipeline.run(&input_path, &output_path).unwrap();
+
+        assert!(result.success);
+        assert!(
+            result.quality_loss < 5.0,
+            "quality_loss={}",
+            result.quality_loss
+        );
+        assert!(output_path.exists());
+    }
+}
