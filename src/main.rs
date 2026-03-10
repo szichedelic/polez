@@ -281,6 +281,7 @@ fn run_command(
             format,
             naming.as_deref(),
             fp_flags.into(),
+            json_mode,
             console,
             banner,
         ),
@@ -679,23 +680,26 @@ fn cmd_sweep(
     format: FormatChoice,
     naming: Option<&str>,
     fp_config: config::FingerprintRemovalConfig,
+    json_mode: bool,
     console: &ConsoleManager,
     banner: &BannerManager,
 ) -> error::Result<()> {
     let out_format = resolve_output_format(format)?;
     let start = Instant::now();
 
-    console.success(&format!(
-        "Batch processing initiated: {}",
-        directory.display()
-    ));
-    console.info(&format!("Extensions: {}", extensions.join(", ")));
-    console.info(&format!(
-        "Workers: {} | Paranoid: {} | Recursive: {}",
-        workers,
-        if paranoid { "ON" } else { "OFF" },
-        if recursive { "ON" } else { "OFF" },
-    ));
+    if !json_mode {
+        console.success(&format!(
+            "Batch processing initiated: {}",
+            directory.display()
+        ));
+        console.info(&format!("Extensions: {}", extensions.join(", ")));
+        console.info(&format!(
+            "Workers: {} | Paranoid: {} | Recursive: {}",
+            workers,
+            if paranoid { "ON" } else { "OFF" },
+            if recursive { "ON" } else { "OFF" },
+        ));
+    }
 
     let walker = walkdir::WalkDir::new(directory);
     let walker = if recursive {
@@ -719,13 +723,26 @@ fn cmd_sweep(
         .collect();
 
     if files.is_empty() {
+        if json_mode {
+            return print_json(&serde_json::json!({
+                "total": 0, "success": 0, "failed": 0, "files": []
+            }));
+        }
         console.warning("No audio files found in directory");
         return Ok(());
     }
 
-    console.success(&format!("Found {} files to process", files.len()));
+    if !json_mode {
+        console.success(&format!("Found {} files to process", files.len()));
+    }
 
     if dry_run {
+        if json_mode {
+            let file_list: Vec<String> = files.iter().map(|f| f.display().to_string()).collect();
+            return print_json(&serde_json::json!({
+                "dry_run": true, "total": files.len(), "files": file_list
+            }));
+        }
         console.info("DRY RUN - No files will be processed:");
         for file in &files {
             console.info(&format!("  Would process: {}", file.display()));
@@ -756,7 +773,11 @@ fn cmd_sweep(
     let quality_str = config_mgr.config.preserve_quality.to_string();
     let flags = config_mgr.config.advanced_flags.clone();
 
-    let pb = ui::progress::batch_progress(files.len() as u64);
+    let pb = if json_mode {
+        indicatif::ProgressBar::hidden()
+    } else {
+        ui::progress::batch_progress(files.len() as u64)
+    };
 
     use rayon::prelude::*;
 
@@ -831,6 +852,21 @@ fn cmd_sweep(
     }
 
     let elapsed = start.elapsed().as_secs_f64();
+
+    if json_mode {
+        let failed_json: Vec<serde_json::Value> = failed_files
+            .iter()
+            .map(|(f, e)| serde_json::json!({"file": f, "error": e}))
+            .collect();
+        return print_json(&serde_json::json!({
+            "total": files.len(),
+            "success": success_count,
+            "failed": fail_count,
+            "processing_time": elapsed,
+            "output_dir": out_dir.display().to_string(),
+            "failures": failed_json,
+        }));
+    }
 
     console.display_batch_summary(&BatchSummaryDisplay {
         total: files.len(),
