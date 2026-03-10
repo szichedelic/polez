@@ -44,6 +44,7 @@ impl WatermarkDetector {
         "amplitude_modulation",
         "frequency_domain",
         "lsb_steganography",
+        "codec_artifacts",
     ];
 
     /// Run all detection methods on the audio buffer.
@@ -72,6 +73,7 @@ impl WatermarkDetector {
             ("amplitude_modulation", detect_amplitude_modulation),
             ("frequency_domain", detect_frequency_domain),
             ("lsb_steganography", detect_lsb_steganography),
+            ("codec_artifacts", detect_codec_artifacts),
         ];
 
         for (name, method) in &methods {
@@ -579,6 +581,209 @@ fn detect_lsb_steganography(channel: &[f32], _sr: u32) -> MethodResult {
     }
 
     if max_confidence > 0.3 {
+        result.detected = true;
+    }
+
+    result.confidence = max_confidence;
+    result
+}
+
+/// Method 8: Codec artifact fingerprint detection.
+/// Detects residual MP3/AAC encoding artifacts even after format conversion.
+/// MP3 uses 1152-sample frames which leave periodic spectral discontinuities.
+/// Also detects characteristic high-frequency rolloff patterns from lossy codecs.
+fn detect_codec_artifacts(channel: &[f32], sr: u32) -> MethodResult {
+    let mut result = MethodResult::default();
+    let mut max_confidence: f64 = 0.0;
+
+    if channel.len() < 8192 {
+        return result;
+    }
+
+    // Test 1: MP3 frame boundary detection (1152-sample periodicity)
+    // Compute energy at each sample position, then look for periodic dips at frame boundaries
+    let frame_size = 1152;
+    let n_frames = channel.len() / frame_size;
+    if n_frames >= 4 {
+        let mut boundary_diffs: Vec<f64> = Vec::new();
+        let mut interior_diffs: Vec<f64> = Vec::new();
+
+        for f in 0..n_frames.saturating_sub(1) {
+            let boundary = f * frame_size + frame_size;
+            if boundary + 1 >= channel.len() {
+                break;
+            }
+            // Energy discontinuity at frame boundary
+            let diff = (channel[boundary] as f64 - channel[boundary - 1] as f64).abs();
+            boundary_diffs.push(diff);
+
+            // Compare with interior sample differences
+            let mid = f * frame_size + frame_size / 2;
+            if mid + 1 < channel.len() {
+                let mid_diff = (channel[mid] as f64 - channel[mid - 1] as f64).abs();
+                interior_diffs.push(mid_diff);
+            }
+        }
+
+        if !boundary_diffs.is_empty() && !interior_diffs.is_empty() {
+            let boundary_mean: f64 =
+                boundary_diffs.iter().sum::<f64>() / boundary_diffs.len() as f64;
+            let interior_mean: f64 =
+                interior_diffs.iter().sum::<f64>() / interior_diffs.len() as f64;
+
+            // MP3 artifacts show higher discontinuity at frame boundaries
+            if interior_mean > 1e-10 {
+                let ratio = boundary_mean / interior_mean;
+                if ratio > 1.3 {
+                    let conf = ((ratio - 1.0) / 2.0).min(1.0);
+                    max_confidence = max_confidence.max(conf);
+                    result.details.push(format!(
+                        "MP3 frame boundary artifacts: discontinuity ratio {ratio:.2}x (1152-sample period)"
+                    ));
+                }
+            }
+        }
+    }
+
+    // Test 2: High-frequency rolloff detection
+    // Lossy codecs aggressively cut frequencies above a threshold
+    let nyquist = sr as f64 / 2.0;
+    let nperseg = 4096.min(channel.len() / 2);
+    let noverlap = nperseg / 4;
+    let (spectrogram, _) = stft::stft(channel, nperseg, noverlap);
+
+    if !spectrogram.is_empty() {
+        let n_freqs = spectrogram[0].len();
+        let freq_resolution = sr as f64 / nperseg as f64;
+
+        // Average magnitude spectrum across all frames
+        let mut avg_spectrum = vec![0.0f64; n_freqs];
+        for frame in &spectrogram {
+            for (i, val) in frame.iter().enumerate() {
+                avg_spectrum[i] += val.norm() as f64;
+            }
+        }
+        for val in &mut avg_spectrum {
+            *val /= spectrogram.len() as f64;
+        }
+
+        // Find the frequency where energy drops sharply (codec cutoff)
+        let max_energy: f64 = avg_spectrum.iter().cloned().fold(0.0, f64::max);
+        if max_energy > 1e-10 {
+            let threshold = max_energy * 0.01;
+            let mut cutoff_bin = n_freqs;
+
+            // Scan from high to low to find where energy rises above threshold
+            for i in (n_freqs / 2..n_freqs).rev() {
+                if avg_spectrum[i] > threshold {
+                    cutoff_bin = i + 1;
+                    break;
+                }
+            }
+
+            let cutoff_freq = cutoff_bin as f64 * freq_resolution;
+
+            // Common lossy codec cutoffs (in Hz)
+            let codec_cutoffs = [
+                (16000.0, "MP3 128kbps"),
+                (17500.0, "MP3 160kbps"),
+                (18500.0, "MP3 192kbps"),
+                (19500.0, "MP3 256kbps / AAC 128kbps"),
+                (20000.0, "MP3 320kbps / AAC 192kbps"),
+                (20500.0, "AAC 256kbps"),
+            ];
+
+            // Sharp cutoff well below nyquist suggests lossy codec
+            if cutoff_freq < nyquist * 0.9 && cutoff_freq > 10000.0 {
+                // Check if cutoff is sharp (steep drop)
+                let above = cutoff_bin.min(n_freqs);
+                let below = cutoff_bin.saturating_sub(10);
+                if above > below {
+                    let energy_below: f64 = avg_spectrum[below..cutoff_bin.min(n_freqs)]
+                        .iter()
+                        .sum::<f64>()
+                        / (cutoff_bin.min(n_freqs) - below) as f64;
+                    let energy_above: f64 = if above < n_freqs {
+                        avg_spectrum[above..n_freqs.min(above + 10)]
+                            .iter()
+                            .sum::<f64>()
+                            / (n_freqs.min(above + 10) - above).max(1) as f64
+                    } else {
+                        0.0
+                    };
+
+                    if energy_below > 1e-10 {
+                        let drop_ratio = energy_above / energy_below;
+                        if drop_ratio < 0.1 {
+                            let conf = (1.0 - drop_ratio * 5.0).clamp(0.3, 0.9);
+                            max_confidence = max_confidence.max(conf);
+
+                            // Match to known codec profile
+                            let mut best_match = "unknown lossy codec";
+                            let mut best_dist = f64::MAX;
+                            for (freq, name) in &codec_cutoffs {
+                                let dist = (cutoff_freq - freq).abs();
+                                if dist < best_dist {
+                                    best_dist = dist;
+                                    best_match = name;
+                                }
+                            }
+
+                            result.details.push(format!(
+                                "Frequency cutoff at {cutoff_freq:.0} Hz — likely {best_match}"
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Test 3: Spectral band replication detection (common in AAC HE / MP3 SBR)
+    // SBR copies lower frequency content to fill upper bands, creating correlation
+    if !spectrogram.is_empty() {
+        let n_freqs = spectrogram[0].len();
+        let mid_bin = n_freqs / 2;
+        let quarter_bin = n_freqs / 4;
+
+        if mid_bin > quarter_bin && quarter_bin > 0 {
+            let mut correlation_sum = 0.0f64;
+            let mut count = 0usize;
+
+            for frame in spectrogram.iter().take(50) {
+                let low_band: Vec<f64> = frame[quarter_bin..mid_bin]
+                    .iter()
+                    .map(|c| c.norm() as f64)
+                    .collect();
+                let high_band: Vec<f64> = frame[mid_bin..mid_bin + (mid_bin - quarter_bin)]
+                    .iter()
+                    .take(low_band.len())
+                    .map(|c| c.norm() as f64)
+                    .collect();
+
+                if low_band.len() == high_band.len() && !low_band.is_empty() {
+                    let corr = stats::pearson_correlation(&low_band, &high_band);
+                    if corr.is_finite() {
+                        correlation_sum += corr.abs();
+                        count += 1;
+                    }
+                }
+            }
+
+            if count > 0 {
+                let avg_corr = correlation_sum / count as f64;
+                if avg_corr > 0.5 {
+                    let conf = (avg_corr * 0.8).min(0.9);
+                    max_confidence = max_confidence.max(conf);
+                    result.details.push(format!(
+                        "Spectral band replication detected: correlation {avg_corr:.3}"
+                    ));
+                }
+            }
+        }
+    }
+
+    if max_confidence > 0.25 {
         result.detected = true;
     }
 
