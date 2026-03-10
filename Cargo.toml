@@ -87,6 +87,10 @@ proptest = "1"
 tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
 
+[lib]
+name = "polez"
+path = "src/lib.rs"
+
 [[bin]]
 name = "polez"
 path = "src/main.rs"

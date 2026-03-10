@@ -1,17 +1,5 @@
 #![allow(dead_code)]
 
-mod audio;
-mod cli;
-mod config;
-mod detection;
-mod error;
-#[cfg(feature = "gui")]
-mod gui;
-mod inspect;
-mod sanitization;
-mod ui;
-mod verification;
-
 use std::path::{Path, PathBuf};
 use std::process;
 use std::time::Instant;
@@ -20,15 +8,25 @@ use clap::Parser;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use cli::{Cli, Commands, ConfigAction, FormatChoice};
-use config::ConfigManager;
-use detection::{MetadataScanner, StatisticalAnalyzer, WatermarkDetector};
-use sanitization::pipeline::SanitizationMode;
-use sanitization::SanitizationPipeline;
-use ui::banners::BannerManager;
-use ui::console::{
+use polez::audio;
+use polez::cli;
+use polez::cli::{Cli, Commands, ConfigAction, FormatChoice};
+use polez::config;
+use polez::config::ConfigManager;
+use polez::detection;
+use polez::detection::{MetadataScanner, StatisticalAnalyzer, WatermarkDetector};
+use polez::error;
+#[cfg(feature = "gui")]
+use polez::gui;
+use polez::inspect;
+use polez::sanitization::pipeline::SanitizationMode;
+use polez::sanitization::SanitizationPipeline;
+use polez::ui;
+use polez::ui::banners::BannerManager;
+use polez::ui::console::{
     AnalysisDisplay, BatchSummaryDisplay, ConsoleManager, SanitizationDisplay, VerificationDisplay,
 };
+use polez::verification;
 
 #[derive(Serialize)]
 struct JsonReport {
