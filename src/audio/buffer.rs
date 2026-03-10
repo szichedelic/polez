@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn test_join_single_chunk() {
         let buf = AudioBuffer::from_mono(vec![0.1, 0.2], 44100);
-        let joined = AudioBuffer::join_chunks(&[buf.clone()], 0);
+        let joined = AudioBuffer::join_chunks(std::slice::from_ref(&buf), 0);
         assert_eq!(joined.num_samples(), 2);
     }
 
