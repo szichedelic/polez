@@ -13,6 +13,10 @@ pub use flags::{AdvancedFlagsCli, FingerprintFlagsCli};
     long_about = "Audio forensics tool for analyzing and sanitizing watermarks and metadata\nfrom audio files."
 )]
 pub struct Cli {
+    /// Output results as JSON to stdout (suppresses banners and progress bars)
+    #[arg(long, global = true)]
+    pub json: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }
