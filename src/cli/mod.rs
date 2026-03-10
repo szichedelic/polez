@@ -95,6 +95,11 @@ Examples:
         #[arg(long, value_parser = clap::value_parser!(u16).range(16..=32))]
         bit_depth: Option<u16>,
 
+        /// Output file naming template. Variables: {name}, {ext}, {date}, {mode}, {quality}, {counter}
+        /// Example: '{name}_{date}_{mode}{ext}'
+        #[arg(long)]
+        naming: Option<String>,
+
         /// Target specific frequency ranges for cleaning (Hz), e.g. --freq-range 15000-22000
         /// Multiple ranges supported. Default: full spectrum.
         #[arg(long, value_parser = parse_freq_range)]
@@ -150,6 +155,11 @@ Examples:
         /// Output audio format (overrides input format)
         #[arg(short, long, value_enum, default_value = "preserve")]
         format: FormatChoice,
+
+        /// Output file naming template. Variables: {name}, {ext}, {date}, {mode}, {quality}, {counter}
+        /// Example: '{name}_{mode}{ext}'
+        #[arg(long)]
+        naming: Option<String>,
 
         #[command(flatten)]
         fp_flags: FingerprintFlagsCli,

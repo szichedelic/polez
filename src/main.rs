@@ -228,6 +228,7 @@ fn run_command(
             audit_log,
             sample_rate,
             bit_depth,
+            naming,
             freq_range,
             flags,
             fp_flags,
@@ -245,6 +246,7 @@ fn run_command(
             format,
             sample_rate,
             bit_depth,
+            naming.as_deref(),
             freq_range,
             flags.into(),
             fp_flags.into(),
@@ -262,6 +264,7 @@ fn run_command(
             recursive,
             dry_run,
             format,
+            naming,
             fp_flags,
         } => cmd_sweep(
             &directory,
@@ -273,6 +276,7 @@ fn run_command(
             recursive,
             dry_run,
             format,
+            naming.as_deref(),
             fp_flags.into(),
             console,
             banner,
@@ -357,6 +361,7 @@ fn cmd_clean(
     format: FormatChoice,
     target_sample_rate: Option<u32>,
     bit_depth: Option<u16>,
+    naming: Option<&str>,
     freq_ranges: Vec<(f64, f64)>,
     flags: config::AdvancedFlags,
     fp_config: config::FingerprintRemovalConfig,
@@ -398,12 +403,21 @@ fn cmd_clean(
 
     let config_mgr = ConfigManager::new()?;
 
+    let naming_pattern = naming
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| config_mgr.config.batch_processing.naming_pattern.clone());
+    validate_naming_template(&naming_pattern)?;
+
+    let mode_for_naming = match quality {
+        Some(q) => quality_to_mode(q),
+        None => SanitizationPipeline::mode_from_config(&config_mgr.config),
+    };
+    let mode_str = format!("{mode_for_naming:?}").to_lowercase();
+    let quality_str = config_mgr.config.preserve_quality.to_string();
+
     let output_path = match output {
         Some(p) => p.to_path_buf(),
-        None => generate_output_path(
-            input_file,
-            &config_mgr.config.batch_processing.naming_pattern,
-        ),
+        None => generate_output_path(input_file, &naming_pattern, &mode_str, &quality_str),
     };
 
     let out_format = resolve_output_format(format)?;
@@ -661,6 +675,7 @@ fn cmd_sweep(
     recursive: bool,
     dry_run: bool,
     format: FormatChoice,
+    naming: Option<&str>,
     fp_config: config::FingerprintRemovalConfig,
     console: &ConsoleManager,
     banner: &BannerManager,
@@ -730,7 +745,13 @@ fn cmd_sweep(
     };
 
     let config_mgr = ConfigManager::new()?;
+    let sweep_naming = naming
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| config_mgr.config.batch_processing.naming_pattern.clone());
+    validate_naming_template(&sweep_naming)?;
     let mode = SanitizationPipeline::mode_from_config(&config_mgr.config);
+    let mode_str = format!("{mode:?}").to_lowercase();
+    let quality_str = config_mgr.config.preserve_quality.to_string();
     let flags = config_mgr.config.advanced_flags.clone();
 
     let pb = ui::progress::batch_progress(files.len() as u64);
@@ -747,7 +768,13 @@ fn cmd_sweep(
             .par_iter()
             .map(|file| {
                 let relative = file.strip_prefix(directory).unwrap_or(file.as_path());
-                let output_file = out_dir.join(relative);
+                let named = generate_output_path(file, &sweep_naming, &mode_str, &quality_str);
+                let named_filename = named.file_name().unwrap_or_default();
+                let output_file = if let Some(parent) = relative.parent() {
+                    out_dir.join(parent).join(named_filename)
+                } else {
+                    out_dir.join(named_filename)
+                };
 
                 if let Some(parent) = output_file.parent() {
                     let _ = std::fs::create_dir_all(parent);
@@ -1532,16 +1559,109 @@ fn resolve_output_format(format: FormatChoice) -> error::Result<Option<audio::Au
     }
 }
 
-fn generate_output_path(input: &Path, pattern: &str) -> PathBuf {
+fn generate_output_path(input: &Path, pattern: &str, mode: &str, quality: &str) -> PathBuf {
     let stem = input
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("output");
     let ext = input.extension().and_then(|s| s.to_str()).unwrap_or("wav");
+    let date = chrono::Local::now().format("%Y-%m-%d").to_string();
 
     let name = pattern
         .replace("{name}", stem)
-        .replace("{ext}", &format!(".{ext}"));
+        .replace("{ext}", &format!(".{ext}"))
+        .replace("{date}", &date)
+        .replace("{mode}", mode)
+        .replace("{quality}", quality)
+        .replace("{counter}", "001");
 
     input.with_file_name(name)
+}
+
+/// Validate that a naming template only contains known variables.
+fn validate_naming_template(pattern: &str) -> error::Result<()> {
+    let known = [
+        "{name}",
+        "{ext}",
+        "{date}",
+        "{mode}",
+        "{quality}",
+        "{counter}",
+    ];
+    let mut rest = pattern;
+    while let Some(start) = rest.find('{') {
+        if let Some(end) = rest[start..].find('}') {
+            let var = &rest[start..start + end + 1];
+            if !known.contains(&var) {
+                return Err(error::PolezError::Config(format!(
+                    "Unknown naming template variable '{var}'. Valid: {}",
+                    known.join(", ")
+                )));
+            }
+            rest = &rest[start + end + 1..];
+        } else {
+            return Err(error::PolezError::Config(
+                "Unclosed '{' in naming template".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_output_path_default() {
+        let input = Path::new("/tmp/track.wav");
+        let result = generate_output_path(input, "{name}_clean{ext}", "standard", "high");
+        assert_eq!(result.file_name().unwrap(), "track_clean.wav");
+    }
+
+    #[test]
+    fn test_generate_output_path_with_mode() {
+        let input = Path::new("/tmp/song.mp3");
+        let result = generate_output_path(input, "{name}_{mode}{ext}", "fast", "low");
+        assert_eq!(result.file_name().unwrap(), "song_fast.mp3");
+    }
+
+    #[test]
+    fn test_generate_output_path_with_date() {
+        let input = Path::new("/tmp/file.wav");
+        let result = generate_output_path(input, "{name}_{date}{ext}", "standard", "high");
+        let name = result.file_name().unwrap().to_str().unwrap();
+        assert!(name.starts_with("file_"));
+        assert!(name.ends_with(".wav"));
+        assert!(name.contains('-'));
+    }
+
+    #[test]
+    fn test_generate_output_path_with_quality() {
+        let input = Path::new("/tmp/audio.flac");
+        let result = generate_output_path(input, "{name}_{quality}{ext}", "standard", "maximum");
+        assert_eq!(result.file_name().unwrap(), "audio_maximum.flac");
+    }
+
+    #[test]
+    fn test_validate_naming_template_valid() {
+        assert!(validate_naming_template("{name}_clean{ext}").is_ok());
+        assert!(validate_naming_template("{name}_{date}_{mode}{ext}").is_ok());
+        assert!(validate_naming_template("{name}_{counter}{ext}").is_ok());
+        assert!(validate_naming_template("prefix_{name}{ext}").is_ok());
+    }
+
+    #[test]
+    fn test_validate_naming_template_unknown_var() {
+        let result = validate_naming_template("{name}_{unknown}{ext}");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("unknown"));
+    }
+
+    #[test]
+    fn test_validate_naming_template_unclosed_brace() {
+        let result = validate_naming_template("{name}_{broken");
+        assert!(result.is_err());
+    }
 }
