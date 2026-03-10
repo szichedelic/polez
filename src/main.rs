@@ -226,6 +226,7 @@ fn run_command(
             format,
             report,
             audit_log,
+            sample_rate,
             freq_range,
             flags,
             fp_flags,
@@ -241,6 +242,7 @@ fn run_command(
             report.as_deref(),
             audit_log.as_deref(),
             format,
+            sample_rate,
             freq_range,
             flags.into(),
             fp_flags.into(),
@@ -351,6 +353,7 @@ fn cmd_clean(
     report: Option<&Path>,
     audit_log: Option<&Path>,
     format: FormatChoice,
+    target_sample_rate: Option<u32>,
     freq_ranges: Vec<(f64, f64)>,
     flags: config::AdvancedFlags,
     fp_config: config::FingerprintRemovalConfig,
@@ -360,6 +363,22 @@ fn cmd_clean(
 ) -> error::Result<()> {
     if !input_file.exists() {
         return Err(error::PolezError::FileNotFound(input_file.to_path_buf()));
+    }
+
+    if let Some(sr) = target_sample_rate {
+        const VALID_RATES: &[u32] = &[
+            8000, 11025, 16000, 22050, 44100, 48000, 88200, 96000, 176400, 192000,
+        ];
+        if !VALID_RATES.contains(&sr) {
+            return Err(error::PolezError::AudioIo(format!(
+                "Invalid sample rate {sr} Hz. Supported: {}",
+                VALID_RATES
+                    .iter()
+                    .map(|r| r.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )));
+        }
     }
 
     if !json_mode {
@@ -483,6 +502,7 @@ fn cmd_clean(
         fp_config,
         out_format,
         freq_ranges,
+        target_sample_rate,
     );
 
     if !json_mode {
@@ -737,6 +757,7 @@ fn cmd_sweep(
                     fp_config.clone(),
                     out_format,
                     Vec::new(),
+                    None,
                 );
                 let result = pipeline
                     .run(file, &output_file)

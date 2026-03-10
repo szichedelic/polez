@@ -43,9 +43,11 @@ pub struct SanitizationPipeline {
     fp_config: FingerprintRemovalConfig,
     output_format: Option<AudioFormat>,
     freq_ranges: Vec<(f64, f64)>,
+    target_sample_rate: Option<u32>,
 }
 
 impl SanitizationPipeline {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         mode: SanitizationMode,
         paranoid: bool,
@@ -54,6 +56,7 @@ impl SanitizationPipeline {
         fp_config: FingerprintRemovalConfig,
         output_format: Option<AudioFormat>,
         freq_ranges: Vec<(f64, f64)>,
+        target_sample_rate: Option<u32>,
     ) -> Self {
         Self {
             mode,
@@ -63,6 +66,7 @@ impl SanitizationPipeline {
             fp_config,
             output_format,
             freq_ranges,
+            target_sample_rate,
         }
     }
 
@@ -122,6 +126,20 @@ impl SanitizationPipeline {
         } else {
             0.0
         };
+
+        // Resample if a target sample rate was specified
+        if let Some(target_sr) = self.target_sample_rate {
+            if target_sr != buffer.sample_rate {
+                use super::dsp::resample;
+                let mut new_channels = Vec::with_capacity(buffer.num_channels());
+                for ch in 0..buffer.num_channels() {
+                    let ch_data: Vec<f32> = buffer.channel(ch).to_vec();
+                    let resampled = resample::resample(&ch_data, buffer.sample_rate, target_sr);
+                    new_channels.push(resampled);
+                }
+                buffer = AudioBuffer::from_channels(new_channels, target_sr);
+            }
+        }
 
         let out_format = self.output_format.unwrap_or(source_format);
         // Fall back to WAV if the source format has no encoder

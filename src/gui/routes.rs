@@ -741,6 +741,7 @@ async fn clean_file(
             cfg.fingerprint_removal,
             None,
             Vec::new(),
+            None,
         );
         pipeline.run(&input_path, &out)
     })

@@ -87,6 +87,10 @@ Examples:
         #[arg(long)]
         audit_log: Option<PathBuf>,
 
+        /// Target output sample rate in Hz (e.g. 44100, 48000, 96000)
+        #[arg(long)]
+        sample_rate: Option<u32>,
+
         /// Target specific frequency ranges for cleaning (Hz), e.g. --freq-range 15000-22000
         /// Multiple ranges supported. Default: full spectrum.
         #[arg(long, value_parser = parse_freq_range)]

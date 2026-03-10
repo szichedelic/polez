@@ -42,6 +42,22 @@ impl AudioBuffer {
         }
     }
 
+    /// Create a buffer from separate channel vectors.
+    pub fn from_channels(channels: Vec<Vec<f32>>, sample_rate: u32) -> Self {
+        let num_channels = channels.len();
+        let num_samples = channels.first().map(|c| c.len()).unwrap_or(0);
+        let mut samples = Array2::zeros((num_samples, num_channels));
+        for (ch, data) in channels.iter().enumerate() {
+            for (i, &val) in data.iter().enumerate().take(num_samples) {
+                samples[[i, ch]] = val;
+            }
+        }
+        Self {
+            samples,
+            sample_rate,
+        }
+    }
+
     pub fn num_samples(&self) -> usize {
         self.samples.nrows()
     }
