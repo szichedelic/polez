@@ -204,7 +204,13 @@ async fn analyze_watermark(
         .as_ref()
         .ok_or((StatusCode::BAD_REQUEST, "No file loaded".to_string()))?;
     let result = WatermarkDetector::detect_all(buffer);
-    Ok(Json(serde_json::to_value(result).unwrap()))
+    let value = serde_json::to_value(result).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Serialization error: {e}"),
+        )
+    })?;
+    Ok(Json(value))
 }
 
 async fn analyze_polez(
@@ -216,7 +222,13 @@ async fn analyze_polez(
         .as_ref()
         .ok_or((StatusCode::BAD_REQUEST, "No file loaded".to_string()))?;
     let result = PolezDetector::detect(buffer);
-    Ok(Json(serde_json::to_value(result).unwrap()))
+    let value = serde_json::to_value(result).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Serialization error: {e}"),
+        )
+    })?;
+    Ok(Json(value))
 }
 
 async fn analyze_statistical(
@@ -228,7 +240,13 @@ async fn analyze_statistical(
         .as_ref()
         .ok_or((StatusCode::BAD_REQUEST, "No file loaded".to_string()))?;
     let result = StatisticalAnalyzer::analyze(buffer);
-    Ok(Json(serde_json::to_value(result).unwrap()))
+    let value = serde_json::to_value(result).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Serialization error: {e}"),
+        )
+    })?;
+    Ok(Json(value))
 }
 
 async fn analyze_metadata(
@@ -245,7 +263,13 @@ async fn analyze_metadata(
             format!("Scan error: {e}"),
         )
     })?;
-    Ok(Json(serde_json::to_value(result).unwrap()))
+    let value = serde_json::to_value(result).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Serialization error: {e}"),
+        )
+    })?;
+    Ok(Json(value))
 }
 
 async fn analyze_all(
@@ -594,8 +618,14 @@ async fn clean_file(
     // Run detection on original (before)
     let before = {
         let s = state.read().await;
-        let buf = s.buffer.as_ref().unwrap();
-        let fp = s.file_path.as_ref().unwrap();
+        let buf = s.buffer.as_ref().ok_or((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Original buffer no longer available".to_string(),
+        ))?;
+        let fp = s.file_path.as_ref().ok_or((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Original file path no longer available".to_string(),
+        ))?;
         let watermark = WatermarkDetector::detect_all(buf);
         let polez = PolezDetector::detect(buf);
         let statistical = StatisticalAnalyzer::analyze(buf);
