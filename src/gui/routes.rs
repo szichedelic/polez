@@ -1249,8 +1249,11 @@ async fn batch_clean(
                     s.temp_paths.push(input_path.to_path_buf());
                 }
                 download_ids.insert(filename.clone(), id.clone());
-                // Store download path in a simple global map
-                BATCH_DOWNLOADS.lock().unwrap().insert(id, output_path);
+                // Store download path with timestamp for TTL-based cleanup
+                if let Ok(mut map) = BATCH_DOWNLOADS.lock() {
+                    purge_stale_downloads(&mut map);
+                    map.insert(id, (output_path, std::time::Instant::now()));
+                }
                 results.push(BatchFileResult {
                     filename,
                     success: true,
@@ -1278,8 +1281,17 @@ async fn batch_clean(
 }
 
 static BATCH_DOWNLOADS: std::sync::LazyLock<
-    std::sync::Mutex<std::collections::HashMap<String, std::path::PathBuf>>,
+    std::sync::Mutex<std::collections::HashMap<String, (std::path::PathBuf, std::time::Instant)>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+const BATCH_DOWNLOAD_TTL: std::time::Duration = std::time::Duration::from_secs(3600);
+
+fn purge_stale_downloads(
+    map: &mut std::collections::HashMap<String, (std::path::PathBuf, std::time::Instant)>,
+) {
+    let now = std::time::Instant::now();
+    map.retain(|_, (_, created)| now.duration_since(*created) < BATCH_DOWNLOAD_TTL);
+}
 
 fn uuid_simple() -> String {
     use rand::Rng;
@@ -1292,9 +1304,14 @@ async fn batch_download(
 ) -> Result<Response, (StatusCode, String)> {
     let path = BATCH_DOWNLOADS
         .lock()
-        .unwrap()
-        .get(&id)
-        .cloned()
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Download state unavailable".to_string(),
+            )
+        })?
+        .remove(&id)
+        .map(|(p, _)| p)
         .ok_or((StatusCode::NOT_FOUND, "Download not found".to_string()))?;
 
     let bytes = std::fs::read(&path).map_err(|e| {
