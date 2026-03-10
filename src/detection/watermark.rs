@@ -645,15 +645,25 @@ fn detect_lsb_steganography(channel: &[f32], _sr: u32) -> MethodResult {
         ));
     }
 
-    // Test 4: Runs test — natural LSBs should have random run lengths
+    // Test 4: Wald-Wolfowitz runs test — natural LSBs should have random run lengths
     let mut runs = 1usize;
     for i in 1..lsb.len() {
         if lsb[i] != lsb[i - 1] {
             runs += 1;
         }
     }
-    let expected_runs = 1.0 + 2.0 * ones as f64 * (n - ones) as f64 / n as f64;
-    let runs_z = (runs as f64 - expected_runs).abs() / (expected_runs * 0.5).sqrt().max(1.0);
+    let n1 = ones as f64;
+    let n2 = (n - ones) as f64;
+    let nf = n as f64;
+    let expected_runs = 1.0 + 2.0 * n1 * n2 / nf;
+    // Correct variance: Var(R) = 2*n1*n2*(2*n1*n2 - n) / (n^2 * (n-1))
+    let variance = if nf > 1.0 {
+        2.0 * n1 * n2 * (2.0 * n1 * n2 - nf) / (nf * nf * (nf - 1.0))
+    } else {
+        1.0
+    };
+    let std_dev = variance.sqrt().max(1.0);
+    let runs_z = (runs as f64 - expected_runs).abs() / std_dev;
 
     if runs_z > 2.58 {
         let conf = (runs_z / 5.0).min(1.0);
