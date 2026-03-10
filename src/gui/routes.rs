@@ -243,6 +243,15 @@ async fn load_file(
         channels: buffer.num_channels(),
     };
 
+    tracing::info!(
+        action = "load_file",
+        path = %req.path,
+        format = %info.format,
+        duration_secs = info.duration_secs,
+        sample_rate = info.sample_rate,
+        channels = info.channels,
+    );
+
     let waveform_cache = super::WaveformCache::from_buffer(&buffer);
 
     let mut state = state.write().await;
@@ -318,6 +327,15 @@ async fn upload_file(
         sample_rate: buffer.sample_rate,
         channels: buffer.num_channels(),
     };
+
+    tracing::info!(
+        action = "upload_file",
+        filename = %info.file_path,
+        format = %info.format,
+        size_bytes = bytes.len(),
+        duration_secs = info.duration_secs,
+        sample_rate = info.sample_rate,
+    );
 
     let waveform_cache = super::WaveformCache::from_buffer(&buffer);
 
@@ -964,6 +982,17 @@ async fn clean_file(
         s.cleaned_format = Some(cleaned_fmt.to_string());
     }
 
+    tracing::info!(
+        action = "clean_file",
+        source = %file_path,
+        mode = %req.mode.as_deref().unwrap_or("standard"),
+        success = san_result.success,
+        quality_loss = san_result.quality_loss,
+        processing_time = san_result.processing_time,
+        patterns_found = san_result.patterns_found,
+        patterns_suppressed = san_result.patterns_suppressed,
+    );
+
     Ok(Json(CleanResponse {
         success: san_result.success,
         metadata_removed: san_result.metadata_removed,
@@ -1124,6 +1153,12 @@ async fn save_cleaned_file(
         "audio/wav"
     };
 
+    tracing::info!(
+        action = "download_cleaned",
+        filename = %filename,
+        size_bytes = bytes.len(),
+    );
+
     Ok((
         [
             (header::CONTENT_TYPE, content_type),
@@ -1274,6 +1309,16 @@ async fn batch_clean(
         }
     }
 
+    let success_count = results.iter().filter(|r| r.success).count();
+    let fail_count = results.len() - success_count;
+    tracing::info!(
+        action = "batch_clean",
+        total = results.len(),
+        success = success_count,
+        failed = fail_count,
+        mode = %query.mode.as_deref().unwrap_or("standard"),
+    );
+
     Ok(Json(BatchCleanResponse {
         results,
         download_ids,
@@ -1331,6 +1376,12 @@ async fn batch_download(
     } else {
         "audio/wav"
     };
+
+    tracing::info!(
+        action = "batch_download",
+        filename = %filename,
+        size_bytes = bytes.len(),
+    );
 
     Ok((
         [
