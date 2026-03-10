@@ -46,6 +46,7 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/clean", post(clean_file))
         .route("/api/audio/cleaned", get(serve_cleaned_audio))
         .route("/api/waveform/cleaned", get(get_cleaned_waveform))
+        .route("/api/spectrogram/cleaned", get(get_cleaned_spectrogram))
         .route("/api/save", post(save_cleaned_file))
         .fallback(get(static_handler))
         .layer(DefaultBodyLimit::max(500 * 1024 * 1024)) // 500MB
@@ -382,16 +383,10 @@ struct SpectrogramQuery {
     duration: Option<f64>,
 }
 
-async fn get_spectrogram(
-    State(state): State<SharedState>,
-    Query(query): Query<SpectrogramQuery>,
-) -> Result<Json<SpectrogramData>, (StatusCode, String)> {
-    let state = state.read().await;
-    let buffer = state
-        .buffer
-        .as_ref()
-        .ok_or((StatusCode::BAD_REQUEST, "No file loaded".to_string()))?;
-
+fn compute_spectrogram(
+    buffer: &crate::audio::AudioBuffer,
+    query: &SpectrogramQuery,
+) -> Result<SpectrogramData, (StatusCode, String)> {
     let samples = buffer.to_mono_samples();
     let sr = buffer.sample_rate as f64;
     let total_duration = samples.len() as f64 / sr;
@@ -453,7 +448,6 @@ async fn get_spectrogram(
         let frame: Vec<f64> = (bin_min..bin_max)
             .map(|bin| {
                 let mag = fft_buf[bin].norm();
-                // Convert to dB, floor at -120 dB
                 let db = 20.0 * mag.max(1e-12).log10();
                 db.max(-120.0)
             })
@@ -465,7 +459,7 @@ async fn get_spectrogram(
 
     let num_time_frames = magnitudes.len();
 
-    Ok(Json(SpectrogramData {
+    Ok(SpectrogramData {
         magnitudes,
         freq_min,
         freq_max,
@@ -473,7 +467,19 @@ async fn get_spectrogram(
         time_end: end_sec,
         num_freq_bins,
         num_time_frames,
-    }))
+    })
+}
+
+async fn get_spectrogram(
+    State(state): State<SharedState>,
+    Query(query): Query<SpectrogramQuery>,
+) -> Result<Json<SpectrogramData>, (StatusCode, String)> {
+    let state = state.read().await;
+    let buffer = state
+        .buffer
+        .as_ref()
+        .ok_or((StatusCode::BAD_REQUEST, "No file loaded".to_string()))?;
+    compute_spectrogram(buffer, &query).map(Json)
 }
 
 // --- Bitplane endpoint ---
@@ -773,6 +779,20 @@ async fn get_cleaned_waveform(
         duration_secs,
         channels: buffer.num_channels(),
     }))
+}
+
+// --- Cleaned spectrogram endpoint ---
+
+async fn get_cleaned_spectrogram(
+    State(state): State<SharedState>,
+    Query(query): Query<SpectrogramQuery>,
+) -> Result<Json<SpectrogramData>, (StatusCode, String)> {
+    let state = state.read().await;
+    let buffer = state.cleaned_buffer.as_ref().ok_or((
+        StatusCode::BAD_REQUEST,
+        "No cleaned file available".to_string(),
+    ))?;
+    compute_spectrogram(buffer, &query).map(Json)
 }
 
 // --- Save/download cleaned file ---
