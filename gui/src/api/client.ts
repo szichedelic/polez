@@ -183,11 +183,27 @@ export interface CleanResponse {
   verification: VerificationResult;
 }
 
-export async function cleanFile(mode?: string): Promise<CleanResponse> {
+export interface PresetInfo {
+  name: string;
+  description: string;
+  builtin: boolean;
+  paranoia_level: string;
+  preserve_quality: string;
+}
+
+export async function getPresets(): Promise<PresetInfo[]> {
+  const res = await fetch(`${BASE}/api/presets`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function cleanFile(mode?: string, preset?: string): Promise<CleanResponse> {
+  const body: Record<string, string> = { mode: mode || 'standard' };
+  if (preset) body.preset = preset;
   const res = await fetch(`${BASE}/api/clean`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mode: mode || 'standard' }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

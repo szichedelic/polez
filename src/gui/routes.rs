@@ -13,7 +13,10 @@ use std::io::Write;
 use std::path::Path;
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::config::{defaults::default_config, AdvancedFlags};
+use crate::config::{
+    defaults::{builtin_presets, default_config},
+    AdvancedFlags,
+};
 use crate::detection::{MetadataScanner, PolezDetector, StatisticalAnalyzer, WatermarkDetector};
 use crate::sanitization::pipeline::SanitizationMode;
 use crate::sanitization::SanitizationPipeline;
@@ -21,7 +24,7 @@ use crate::verification;
 
 use super::types::{
     AllAnalysisResult, BitPlaneData, CleanRequest, CleanResponse, FileInfo, PlaneSummary,
-    SpectrogramData, VerificationResult, WaveformData,
+    PresetInfo, SpectrogramData, VerificationResult, WaveformData,
 };
 use super::SharedState;
 
@@ -45,6 +48,7 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/analyze/statistical", post(analyze_statistical))
         .route("/api/analyze/metadata", post(analyze_metadata))
         .route("/api/analyze/all", post(analyze_all))
+        .route("/api/presets", get(list_presets))
         .route("/api/clean", post(clean_file))
         .route("/api/audio/cleaned", get(serve_cleaned_audio))
         .route("/api/waveform/cleaned", get(get_cleaned_waveform))
@@ -92,6 +96,20 @@ async fn get_limits() -> Json<serde_json::Value> {
         "max_upload_bytes": MAX_UPLOAD_BYTES,
         "supported_formats": ["wav", "mp3", "flac", "aac", "m4a"]
     }))
+}
+
+async fn list_presets() -> Json<Vec<PresetInfo>> {
+    let presets = builtin_presets()
+        .into_iter()
+        .map(|p| PresetInfo {
+            name: p.name.to_string(),
+            description: p.description.to_string(),
+            builtin: true,
+            paranoia_level: p.paranoia_level.to_string(),
+            preserve_quality: p.preserve_quality.to_string(),
+        })
+        .collect();
+    Json(presets)
 }
 
 #[derive(Deserialize)]
@@ -607,16 +625,25 @@ async fn clean_file(
     let input_path = std::path::PathBuf::from(&file_path);
     let out = output_path.clone();
 
+    // Build config from preset if specified, otherwise use defaults
+    let preset_name = req.preset.clone();
+
     // Run sanitization in blocking thread (CPU-bound)
     let san_result = tokio::task::spawn_blocking(move || {
-        let cfg = default_config();
-        let pipeline = SanitizationPipeline::new(
-            mode,
-            false,
-            AdvancedFlags::default(),
-            cfg.fingerprint_removal,
-            None,
-        );
+        let mut cfg = default_config();
+        let mut flags = AdvancedFlags::default();
+
+        if let Some(name) = &preset_name {
+            if let Some(preset) = builtin_presets().into_iter().find(|p| p.name == name) {
+                cfg.paranoia_level = preset.paranoia_level;
+                cfg.preserve_quality = preset.preserve_quality;
+                if let Some(preset_flags) = preset.advanced_flags {
+                    flags = preset_flags;
+                }
+            }
+        }
+
+        let pipeline = SanitizationPipeline::new(mode, false, flags, cfg.fingerprint_removal, None);
         pipeline.run(&input_path, &out)
     })
     .await

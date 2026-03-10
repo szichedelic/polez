@@ -54,9 +54,19 @@ pub struct PlaneSummary {
     pub bias: f64,
 }
 
+#[derive(Serialize)]
+pub struct PresetInfo {
+    pub name: String,
+    pub description: String,
+    pub builtin: bool,
+    pub paranoia_level: String,
+    pub preserve_quality: String,
+}
+
 #[derive(Deserialize)]
 pub struct CleanRequest {
     pub mode: Option<String>,
+    pub preset: Option<String>,
 }
 
 #[derive(Serialize)]

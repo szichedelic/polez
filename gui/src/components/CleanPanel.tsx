@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { cleanFile, saveCleanedFile } from '../api/client';
-import type { CleanResponse, VerificationResult as VerResult } from '../api/client';
+import { useState, useEffect } from 'react';
+import { cleanFile, saveCleanedFile, getPresets } from '../api/client';
+import type { CleanResponse, VerificationResult as VerResult, PresetInfo } from '../api/client';
 
 interface Props {
   fileLoaded: boolean;
@@ -96,16 +96,22 @@ function VerificationPanel({ verification: v }: { verification: VerResult }) {
 
 export function CleanPanel({ fileLoaded, onCleaned }: Props) {
   const [mode, setMode] = useState('standard');
+  const [preset, setPreset] = useState('');
+  const [presets, setPresets] = useState<PresetInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<CleanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    getPresets().then(setPresets).catch(() => {});
+  }, []);
+
   const handleClean = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await cleanFile(mode);
+      const res = await cleanFile(mode, preset || undefined);
       setResult(res);
       onCleaned?.(res);
     } catch (e: any) {
@@ -131,6 +137,20 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
       <div className="flex items-center justify-between mb-3">
         <span className="text-zinc-400 text-sm font-medium">CLEAN</span>
         <div className="flex gap-2 items-center">
+          {presets.length > 0 && (
+            <select
+              value={preset}
+              onChange={(e) => setPreset(e.target.value)}
+              disabled={loading}
+              className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-1 text-xs"
+              title={preset ? presets.find(p => p.name === preset)?.description : 'No preset (use defaults)'}
+            >
+              <option value="">No Preset</option>
+              {presets.map(p => (
+                <option key={p.name} value={p.name}>{p.name}</option>
+              ))}
+            </select>
+          )}
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value)}
@@ -163,6 +183,15 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
 
       {error && (
         <p className="text-red-400 text-sm mb-2">{error}</p>
+      )}
+
+      {preset && presets.length > 0 && (
+        <div className="text-xs text-zinc-500 mb-2">
+          {(() => {
+            const p = presets.find(x => x.name === preset);
+            return p ? `${p.description} — paranoia: ${p.paranoia_level}, quality: ${p.preserve_quality}` : '';
+          })()}
+        </div>
       )}
 
       {!result && !loading && (
