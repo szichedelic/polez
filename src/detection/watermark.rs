@@ -43,6 +43,7 @@ impl WatermarkDetector {
         "phase_modulation",
         "amplitude_modulation",
         "frequency_domain",
+        "lsb_steganography",
     ];
 
     /// Run all detection methods on the audio buffer.
@@ -70,6 +71,7 @@ impl WatermarkDetector {
             ("phase_modulation", detect_phase_modulation),
             ("amplitude_modulation", detect_amplitude_modulation),
             ("frequency_domain", detect_frequency_domain),
+            ("lsb_steganography", detect_lsb_steganography),
         ];
 
         for (name, method) in &methods {
@@ -461,6 +463,123 @@ fn detect_frequency_domain(channel: &[f32], _sr: u32) -> MethodResult {
                 ));
             }
         }
+    }
+
+    result.confidence = max_confidence;
+    result
+}
+
+/// Method 7: LSB steganography detection.
+/// Analyzes least-significant-bit distribution patterns to detect embedded data.
+/// Natural audio has near-random LSBs; steganographic embedding creates statistical bias
+/// and periodic patterns aligned to embedding frame boundaries.
+fn detect_lsb_steganography(channel: &[f32], _sr: u32) -> MethodResult {
+    let mut result = MethodResult::default();
+    let mut max_confidence: f64 = 0.0;
+
+    let n = channel.len().min(65536);
+    if n < 1024 {
+        return result;
+    }
+
+    // Convert to 16-bit samples and extract LSB
+    let samples_i16: Vec<i16> = channel[..n].iter().map(|&s| (s * 32767.0) as i16).collect();
+    let lsb: Vec<u8> = samples_i16.iter().map(|&s| (s & 1) as u8).collect();
+
+    // Test 1: LSB bias — natural audio LSBs should be ~50/50
+    let ones: usize = lsb.iter().map(|&b| b as usize).sum();
+    let ratio = ones as f64 / n as f64;
+    let bias = (ratio - 0.5).abs();
+
+    if bias > 0.02 {
+        max_confidence = max_confidence.max(0.4 + bias * 5.0);
+        result.details.push(format!(
+            "LSB bias: {:.2}% ones (deviation {:.2}%)",
+            ratio * 100.0,
+            bias * 100.0
+        ));
+    }
+
+    // Test 2: LSB pair chi-squared — embedded data disrupts natural pair distribution
+    let mut pair_counts = [0u64; 4]; // 00, 01, 10, 11
+    for pair in lsb.chunks_exact(2) {
+        let idx = (pair[0] as usize) * 2 + pair[1] as usize;
+        pair_counts[idx] += 1;
+    }
+    let total_pairs = (n / 2) as f64;
+    let expected = total_pairs / 4.0;
+    let chi_sq: f64 = pair_counts
+        .iter()
+        .map(|&c| {
+            let diff = c as f64 - expected;
+            diff * diff / expected
+        })
+        .sum();
+
+    // Chi-squared > 7.81 at p=0.05 for df=3
+    if chi_sq > 7.81 {
+        let conf = (chi_sq / 50.0).min(1.0);
+        max_confidence = max_confidence.max(conf);
+        result.details.push(format!(
+            "LSB pair chi-squared: {chi_sq:.2} (threshold 7.81)"
+        ));
+    }
+
+    // Test 3: Periodic autocorrelation on LSB stream — frame-aligned embedding
+    // creates peaks at the embedding frame size
+    let lsb_f: Vec<f64> = lsb.iter().map(|&b| b as f64 - 0.5).collect();
+    let test_lags = [128, 256, 441, 512, 576, 1024, 1152, 2048, 2304, 4096, 4608];
+    let mut strong_lags = Vec::new();
+
+    for &lag in &test_lags {
+        if lag >= lsb_f.len() {
+            continue;
+        }
+        let mut sum = 0.0;
+        let count = lsb_f.len() - lag;
+        for i in 0..count {
+            sum += lsb_f[i] * lsb_f[i + lag];
+        }
+        let corr = (sum / count as f64 * 4.0).abs();
+
+        if corr > 0.05 {
+            strong_lags.push((lag, corr));
+        }
+    }
+
+    if !strong_lags.is_empty() {
+        let best = strong_lags
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .unwrap();
+        let conf = (best.1 * 2.0).min(1.0);
+        max_confidence = max_confidence.max(conf);
+        result.details.push(format!(
+            "LSB periodic pattern at lag {} (correlation {:.3})",
+            best.0, best.1
+        ));
+    }
+
+    // Test 4: Runs test — natural LSBs should have random run lengths
+    let mut runs = 1usize;
+    for i in 1..lsb.len() {
+        if lsb[i] != lsb[i - 1] {
+            runs += 1;
+        }
+    }
+    let expected_runs = 1.0 + 2.0 * ones as f64 * (n - ones) as f64 / n as f64;
+    let runs_z = (runs as f64 - expected_runs).abs() / (expected_runs * 0.5).sqrt().max(1.0);
+
+    if runs_z > 2.58 {
+        let conf = (runs_z / 5.0).min(1.0);
+        max_confidence = max_confidence.max(conf);
+        result.details.push(format!(
+            "LSB runs test: z={runs_z:.2} (expected ~{expected_runs:.0}, got {runs})"
+        ));
+    }
+
+    if max_confidence > 0.3 {
+        result.detected = true;
     }
 
     result.confidence = max_confidence;
