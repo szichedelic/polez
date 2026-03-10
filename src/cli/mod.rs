@@ -24,7 +24,7 @@ pub struct Cli {
     pub json: bool,
 
     /// Increase verbosity (-v = debug, -vv = trace)
-    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
+    #[arg(short, long, global = true, action = clap::ArgAction::Count, conflicts_with = "quiet")]
     pub verbose: u8,
 
     /// Suppress all output except errors and final result
