@@ -1,4 +1,5 @@
 use axum::extract::DefaultBodyLimit;
+use axum::http::HeaderValue;
 use axum::{
     extract::{Multipart, Query, State},
     http::{header, StatusCode},
@@ -11,7 +12,7 @@ use rustfft::FftPlanner;
 use serde::Deserialize;
 use std::io::Write;
 use std::path::Path;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 use crate::config::{
     defaults::{builtin_presets, default_config},
@@ -30,7 +31,13 @@ use super::SharedState;
 
 pub fn create_router(state: SharedState) -> Router {
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
+            let origin = origin.to_str().unwrap_or("");
+            origin.starts_with("http://localhost:")
+                || origin.starts_with("http://127.0.0.1:")
+                || origin == "http://localhost"
+                || origin == "http://127.0.0.1"
+        }))
         .allow_methods(Any)
         .allow_headers(Any);
 
