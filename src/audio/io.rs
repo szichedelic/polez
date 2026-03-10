@@ -7,6 +7,8 @@ use crate::error::{PolezError, Result};
 pub enum AudioFormat {
     Wav,
     Mp3,
+    Flac,
+    Aac,
 }
 
 impl AudioFormat {
@@ -14,7 +16,14 @@ impl AudioFormat {
         match self {
             AudioFormat::Wav => "wav",
             AudioFormat::Mp3 => "mp3",
+            AudioFormat::Flac => "flac",
+            AudioFormat::Aac => "m4a",
         }
+    }
+
+    /// Whether this format has an encoder available for output.
+    pub fn has_encoder(&self) -> bool {
+        matches!(self, AudioFormat::Wav | AudioFormat::Mp3)
     }
 }
 
@@ -23,6 +32,8 @@ impl std::fmt::Display for AudioFormat {
         match self {
             AudioFormat::Wav => write!(f, "WAV"),
             AudioFormat::Mp3 => write!(f, "MP3"),
+            AudioFormat::Flac => write!(f, "FLAC"),
+            AudioFormat::Aac => write!(f, "AAC"),
         }
     }
 }
@@ -37,6 +48,8 @@ pub fn detect_format(path: &Path) -> Result<AudioFormat> {
     {
         Some("wav") => Ok(AudioFormat::Wav),
         Some("mp3") => Ok(AudioFormat::Mp3),
+        Some("flac") => Ok(AudioFormat::Flac),
+        Some("aac") | Some("m4a") => Ok(AudioFormat::Aac),
         Some(ext) => Err(PolezError::UnsupportedFormat(ext.to_string())),
         None => Err(PolezError::UnsupportedFormat("no extension".to_string())),
     }
@@ -47,15 +60,21 @@ pub fn load_audio(path: &Path) -> Result<(AudioBuffer, AudioFormat)> {
     let format = detect_format(path)?;
     match format {
         AudioFormat::Wav => load_wav(path).map(|buf| (buf, format)),
-        AudioFormat::Mp3 => load_mp3(path).map(|buf| (buf, format)),
+        AudioFormat::Mp3 | AudioFormat::Flac | AudioFormat::Aac => {
+            load_symphonia(path, format).map(|buf| (buf, format))
+        }
     }
 }
 
 /// Save an AudioBuffer to a file in the specified format.
+/// Note: FLAC and AAC encoding are not supported; use WAV or MP3 instead.
 pub fn save_audio(buffer: &AudioBuffer, path: &Path, format: AudioFormat) -> Result<()> {
     match format {
         AudioFormat::Wav => save_wav(buffer, path),
         AudioFormat::Mp3 => save_mp3(buffer, path),
+        AudioFormat::Flac | AudioFormat::Aac => Err(PolezError::UnsupportedFormat(format!(
+            "{format} encoding is not supported; use WAV or MP3 output format"
+        ))),
     }
 }
 
@@ -119,9 +138,9 @@ fn save_wav(buffer: &AudioBuffer, path: &Path) -> Result<()> {
     Ok(())
 }
 
-// --- MP3 ---
+// --- Symphonia-based loader (MP3, FLAC, AAC) ---
 
-fn load_mp3(path: &Path) -> Result<AudioBuffer> {
+fn load_symphonia(path: &Path, format: AudioFormat) -> Result<AudioBuffer> {
     use symphonia::core::audio::SampleBuffer;
     use symphonia::core::codecs::DecoderOptions;
     use symphonia::core::formats::FormatOptions;
@@ -129,12 +148,16 @@ fn load_mp3(path: &Path) -> Result<AudioBuffer> {
     use symphonia::core::meta::MetadataOptions;
     use symphonia::core::probe::Hint;
 
+    let format_name = format.to_string();
+
     let file = std::fs::File::open(path)
-        .map_err(|e| PolezError::AudioIo(format!("Failed to open MP3: {e}")))?;
+        .map_err(|e| PolezError::AudioIo(format!("Failed to open {format_name}: {e}")))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
     let mut hint = Hint::new();
-    hint.with_extension("mp3");
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
 
     let probed = symphonia::default::get_probe()
         .format(
@@ -143,7 +166,7 @@ fn load_mp3(path: &Path) -> Result<AudioBuffer> {
             &FormatOptions::default(),
             &MetadataOptions::default(),
         )
-        .map_err(|e| PolezError::AudioIo(format!("MP3 probe error: {e}")))?;
+        .map_err(|e| PolezError::AudioIo(format!("{format_name} probe error: {e}")))?;
 
     let mut format_reader = probed.format;
     let track = format_reader
@@ -156,7 +179,7 @@ fn load_mp3(path: &Path) -> Result<AudioBuffer> {
 
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
-        .map_err(|e| PolezError::AudioIo(format!("MP3 decoder error: {e}")))?;
+        .map_err(|e| PolezError::AudioIo(format!("{format_name} decoder error: {e}")))?;
 
     let mut all_samples: Vec<f32> = Vec::new();
 

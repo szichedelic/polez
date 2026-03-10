@@ -61,7 +61,7 @@ pub enum Commands {
         output_dir: Option<PathBuf>,
 
         /// File extensions to process
-        #[arg(short, long, default_values = ["mp3", "wav"])]
+        #[arg(short, long, default_values = ["mp3", "wav", "flac", "aac", "m4a"])]
         extension: Vec<String>,
 
         /// Maximum destruction mode
@@ -112,7 +112,7 @@ pub enum Commands {
         recursive: bool,
 
         /// File extensions to process
-        #[arg(short, long, default_values = ["mp3", "wav"])]
+        #[arg(short, long, default_values = ["mp3", "wav", "flac", "aac", "m4a"])]
         extension: Vec<String>,
     },
 

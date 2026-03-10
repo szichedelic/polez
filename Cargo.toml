@@ -14,7 +14,7 @@ lofty = "0.21"
 
 # Audio I/O
 hound = "3.5"
-symphonia = { version = "0.5", features = ["mp3", "wav", "pcm", "isomp4", "aac"] }
+symphonia = { version = "0.5", features = ["mp3", "wav", "pcm", "isomp4", "aac", "flac"] }
 mp3lame-encoder = "0.2"
 
 # DSP / FFT

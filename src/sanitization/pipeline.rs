@@ -116,6 +116,12 @@ impl SanitizationPipeline {
         };
 
         let out_format = self.output_format.unwrap_or(source_format);
+        // Fall back to WAV if the source format has no encoder
+        let out_format = if out_format.has_encoder() {
+            out_format
+        } else {
+            audio::AudioFormat::Wav
+        };
         audio::save_audio(&buffer, output, out_format)?;
 
         let elapsed = start.elapsed().as_secs_f64();
