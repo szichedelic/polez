@@ -32,6 +32,7 @@ pub fn create_router(state: SharedState) -> Router {
 
     Router::new()
         .route("/api/health", get(health))
+        .route("/api/limits", get(get_limits))
         .route("/api/load", post(load_file))
         .route("/api/upload", post(upload_file))
         .route("/api/waveform", get(get_waveform))
@@ -49,7 +50,7 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/spectrogram/cleaned", get(get_cleaned_spectrogram))
         .route("/api/save", post(save_cleaned_file))
         .fallback(get(static_handler))
-        .layer(DefaultBodyLimit::max(500 * 1024 * 1024)) // 500MB
+        .layer(DefaultBodyLimit::max(MAX_UPLOAD_BYTES))
         .layer(cors)
         .with_state(state)
 }
@@ -81,6 +82,15 @@ async fn static_handler(uri: axum::http::Uri) -> Response {
 
 async fn health() -> &'static str {
     "ok"
+}
+
+const MAX_UPLOAD_BYTES: usize = 500 * 1024 * 1024; // 500MB
+
+async fn get_limits() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "max_upload_bytes": MAX_UPLOAD_BYTES,
+        "supported_formats": ["wav", "mp3", "flac", "aac", "m4a"]
+    }))
 }
 
 #[derive(Deserialize)]

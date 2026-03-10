@@ -1,11 +1,24 @@
 const BASE = '';
 
+export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500MB
+
 export interface FileInfo {
   file_path: string;
   format: string;
   duration_secs: number;
   sample_rate: number;
   channels: number;
+}
+
+export interface ServerLimits {
+  max_upload_bytes: number;
+  supported_formats: string[];
+}
+
+export async function getLimits(): Promise<ServerLimits> {
+  const res = await fetch(`${BASE}/api/limits`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 export interface WaveformData {
@@ -36,15 +49,37 @@ export interface BitPlaneData {
   planes: PlaneSummary[];
 }
 
-export async function uploadFile(file: File): Promise<FileInfo> {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch(`${BASE}/api/upload`, {
-    method: 'POST',
-    body: form,
+export function uploadFile(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<FileInfo> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${BASE}/api/upload`);
+
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      });
+    }
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText));
+      } else {
+        reject(new Error(xhr.responseText || `Upload failed (${xhr.status})`));
+      }
+    });
+
+    xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+    xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+
+    const form = new FormData();
+    form.append('file', file);
+    xhr.send(form);
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
 }
 
 export async function loadFile(path: string): Promise<FileInfo> {

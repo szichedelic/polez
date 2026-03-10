@@ -1,28 +1,43 @@
 import { useState, useRef, useCallback } from 'react';
 import type { FileInfo } from '../api/client';
-import { uploadFile } from '../api/client';
+import { uploadFile, MAX_UPLOAD_BYTES } from '../api/client';
 
 interface Props {
   fileInfo: FileInfo | null;
   onFileLoaded: (info: FileInfo) => void;
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function FileHeader({ fileInfo, onFileLoaded }: Props) {
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (file: File) => {
-    setLoading(true);
     setError(null);
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError(`File too large (${formatBytes(file.size)}). Maximum is ${formatBytes(MAX_UPLOAD_BYTES)}.`);
+      return;
+    }
+
+    setLoading(true);
+    setProgress(0);
     try {
-      const info = await uploadFile(file);
+      const info = await uploadFile(file, (pct) => setProgress(pct));
       onFileLoaded(info);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+      setProgress(0);
     }
   }, [onFileLoaded]);
 
@@ -95,7 +110,17 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
       <div className="text-purple-400 font-bold text-2xl tracking-widest mb-2">POLEZ</div>
       <div className="text-zinc-500 text-xs mb-4">Audio Forensics & Sanitization Engine</div>
       {loading ? (
-        <div className="text-zinc-400 text-sm animate-pulse">Loading audio...</div>
+        <div className="w-64 space-y-2">
+          <div className="text-zinc-400 text-sm text-center">
+            Uploading... {progress}%
+          </div>
+          <div className="w-full bg-zinc-700 rounded-full h-2">
+            <div
+              className="bg-purple-500 h-2 rounded-full transition-all duration-200"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
       ) : (
         <>
           <div className="text-zinc-400 text-sm">
@@ -108,6 +133,9 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
           >
             Choose File
           </button>
+          <div className="text-zinc-600 text-xs mt-1">
+            Max {formatBytes(MAX_UPLOAD_BYTES)}
+          </div>
           <input
             ref={inputRef}
             type="file"
