@@ -218,6 +218,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
             <option value="aggressive">Aggressive</option>
           </select>
           <button
+            data-action="clean"
             onClick={handleClean}
             disabled={!fileLoaded || loading}
             className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-1 rounded text-xs font-medium"
@@ -226,6 +227,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
           </button>
           {result && (
             <button
+              data-action="save"
               onClick={handleSave}
               disabled={saving}
               className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1 rounded text-xs font-medium"

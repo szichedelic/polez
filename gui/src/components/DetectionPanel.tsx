@@ -53,6 +53,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
         <span className="text-zinc-400 text-sm font-medium">DETECTION</span>
         <div className="flex gap-2">
           <button
+            data-action="detect"
             onClick={() => runAnalysis('all')}
             disabled={!fileLoaded || !!loading}
             className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-1 rounded text-xs font-medium"
