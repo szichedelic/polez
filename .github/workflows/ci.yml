@@ -70,7 +70,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: mkdir -p gui/dist && touch gui/dist/index.html
-      - run: cargo install cargo-tarpaulin
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tarpaulin
       - run: cargo tarpaulin --out xml --skip-clean
       - uses: codecov/codecov-action@v4
         with:
