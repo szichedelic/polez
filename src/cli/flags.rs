@@ -1,5 +1,11 @@
+//! Advanced stealth and fingerprint removal flag definitions.
+//!
+//! These structs map directly to CLI flags that toggle individual DSP
+//! operations in the sanitization pipeline.
+
 use clap::Args;
 
+/// CLI flags controlling 13 individual stealth DSP operations.
 #[derive(Args, Debug, Clone)]
 pub struct AdvancedFlagsCli {
     /// Toggle sub-block phase dither
@@ -55,6 +61,7 @@ pub struct AdvancedFlagsCli {
     pub adaptive_notch: bool,
 }
 
+/// CLI flags controlling fingerprint removal techniques.
 #[derive(Args, Debug, Clone)]
 pub struct FingerprintFlagsCli {
     /// Toggle statistical normalization (kurtosis adjustment)

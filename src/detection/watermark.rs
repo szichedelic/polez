@@ -1,3 +1,8 @@
+//! Watermark detection using multiple signal-analysis methods.
+//!
+//! Includes spread-spectrum, echo, phase/amplitude modulation, frequency-domain,
+//! LSB steganography, codec artifact, phase coherence, and spatial encoding detectors.
+
 use std::collections::HashMap;
 
 use rayon::prelude::*;
@@ -9,23 +14,35 @@ use crate::sanitization::dsp::{hilbert, stats, stft};
 /// Results from watermark detection.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct WatermarkResult {
+    /// Individual watermark detections across all methods.
     pub detected: Vec<WatermarkDetection>,
+    /// Per-method detection results keyed by method name.
     pub method_results: HashMap<String, MethodResult>,
+    /// Combined confidence score across all methods (0.0 to 1.0).
     pub overall_confidence: f64,
+    /// Total number of methods that detected a watermark.
     pub watermark_count: usize,
 }
 
+/// A single watermark detection from one method.
 #[derive(Debug, Clone, Serialize)]
 pub struct WatermarkDetection {
+    /// Name of the detection method that triggered.
     pub method: String,
+    /// Confidence level of the detection (0.0 to 1.0).
     pub confidence: f64,
+    /// Human-readable description of the finding.
     pub description: String,
 }
 
+/// Result from an individual detection method.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct MethodResult {
+    /// Whether this method detected a watermark.
     pub detected: bool,
+    /// Confidence level (0.0 to 1.0).
     pub confidence: f64,
+    /// Descriptive detail strings about the findings.
     pub details: Vec<String>,
 }
 

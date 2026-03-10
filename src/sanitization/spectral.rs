@@ -1,3 +1,8 @@
+//! FFT-based spectral cleaning for watermark removal.
+//!
+//! Detects and suppresses watermarks embedded in high-frequency bands using
+//! STFT analysis, notch filtering, spectral smoothing, and psychoacoustic masking.
+
 use num_complex::Complex;
 use rand::Rng;
 

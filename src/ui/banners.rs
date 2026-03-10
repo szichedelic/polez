@@ -1,5 +1,8 @@
+//! ASCII art banners with gradient coloring for CLI output.
+
 use colored::Colorize;
 
+/// Renders styled ASCII banners for various processing stages.
 pub struct BannerManager;
 
 /// Apply a vertical gradient across lines, interpolating from `top` to `bot` RGB.
@@ -15,10 +18,12 @@ fn gradient_lines(lines: &[&str], top: [u8; 3], bot: [u8; 3]) {
 }
 
 impl BannerManager {
+    /// Create a new banner manager.
     pub fn new() -> Self {
         Self
     }
 
+    /// Display the main Polez ASCII art banner with gradient coloring.
     pub fn show_main_banner(&self) {
         let lines: &[&str] = &[
             "",
@@ -52,6 +57,7 @@ impl BannerManager {
         println!();
     }
 
+    /// Display the main banner followed by version and feature details.
     pub fn show_version_info(&self) {
         self.show_main_banner();
         println!("  Build:    Rust {}", env!("CARGO_PKG_VERSION"));
@@ -69,6 +75,7 @@ impl BannerManager {
         println!();
     }
 
+    /// Display a banner indicating sanitization is in progress.
     pub fn show_processing_banner(&self) {
         let lines: &[&str] = &[
             "",
@@ -79,6 +86,7 @@ impl BannerManager {
         gradient_lines(lines, [0, 200, 220], [0, 140, 180]);
     }
 
+    /// Display a banner indicating sanitization completed successfully.
     pub fn show_success_banner(&self) {
         let lines: &[&str] = &[
             "",
@@ -89,6 +97,7 @@ impl BannerManager {
         gradient_lines(lines, [0, 220, 120], [0, 160, 80]);
     }
 
+    /// Display a banner indicating batch sweep completed with the file count.
     pub fn show_batch_complete_banner(&self, count: usize) {
         let lines: Vec<String> = vec![
             String::new(),

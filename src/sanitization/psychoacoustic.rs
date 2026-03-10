@@ -1,3 +1,8 @@
+//! Psychoacoustic masking model for perceptually transparent audio modifications.
+//!
+//! Implements a simplified ISO 11172-3 masking model to identify inaudible
+//! frequency components that can be modified without introducing audible artifacts.
+
 use num_complex::Complex;
 
 /// Simplified psychoacoustic masking model based on ISO 11172-3 / MPEG-1 Layer III.
@@ -6,7 +11,9 @@ use num_complex::Complex;
 /// content. Components below this threshold are perceptually inaudible and can be
 /// modified without audible artifacts.
 pub struct MaskingModel {
+    /// Audio sample rate in Hz.
     sample_rate: f64,
+    /// FFT window size used for frequency resolution.
     fft_size: usize,
 }
 
@@ -34,6 +41,7 @@ const ATH_FREQS: [(f64, f64); 18] = [
 ];
 
 impl MaskingModel {
+    /// Create a masking model for the given sample rate and FFT size.
     pub fn new(sample_rate: f64, fft_size: usize) -> Self {
         Self {
             sample_rate,

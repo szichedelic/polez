@@ -1,3 +1,7 @@
+//! Metadata tag stripping using lofty.
+//!
+//! Removes all embedded tags (ID3, Vorbis comments, APE, etc.) from audio files.
+
 use std::path::Path;
 
 use lofty::config::WriteOptions;
@@ -5,6 +9,7 @@ use lofty::prelude::*;
 
 use crate::error::{PolezError, Result};
 
+/// Strips all metadata tags from audio files.
 pub struct MetadataCleaner;
 
 impl MetadataCleaner {

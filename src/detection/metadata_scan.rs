@@ -1,3 +1,8 @@
+//! Metadata and binary pattern scanning for tracking identifiers.
+//!
+//! Scans audio file tags (via lofty) and raw bytes for suspicious markers such as
+//! AI-service watermarks, fingerprint identifiers, and tracking metadata.
+
 use std::path::Path;
 
 use lofty::prelude::*;
@@ -8,28 +13,41 @@ use crate::error::Result;
 /// Metadata scan results
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct MetadataScanResult {
+    /// All tags found in the audio file.
     pub tags: Vec<TagInfo>,
+    /// Binary patterns found that may indicate watermarks or tracking.
     pub suspicious_chunks: Vec<ChunkInfo>,
+    /// General anomaly descriptions.
     pub anomalies: Vec<String>,
 }
 
+/// Information about a single metadata tag.
 #[derive(Debug, Clone, Serialize)]
 pub struct TagInfo {
+    /// Tag format (e.g., "Id3v2", "VorbisComments").
     pub tag_type: String,
+    /// Tag key or field name.
     pub key: String,
+    /// Tag value content.
     pub value: String,
+    /// Whether this tag is flagged as potentially tracking-related.
     pub suspicious: bool,
 }
 
+/// A suspicious binary pattern found in the file.
 #[derive(Debug, Clone, Serialize)]
 pub struct ChunkInfo {
+    /// Human-readable description of the pattern.
     pub description: String,
+    /// Byte offset where the pattern was found.
     pub offset: u64,
 }
 
+/// Scans audio files for metadata tags and suspicious binary patterns.
 pub struct MetadataScanner;
 
 impl MetadataScanner {
+    /// Scan an audio file for metadata tags and suspicious binary patterns.
     pub fn scan(path: &Path) -> Result<MetadataScanResult> {
         let mut result = MetadataScanResult::default();
 

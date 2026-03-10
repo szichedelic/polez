@@ -1,12 +1,22 @@
+//! Biquad filter design and processing.
+//!
+//! Implements second-order IIR filter design (Butterworth, notch, allpass,
+//! peaking EQ, high-shelf, bandpass) and Direct Form II Transposed processing.
+
 use std::f64::consts::PI;
 
 /// Biquad filter coefficients in Direct Form I: H(z) = (b0 + b1*z^-1 + b2*z^-2) / (1 + a1*z^-1 + a2*z^-2)
 #[derive(Debug, Clone, Copy)]
 pub struct BiquadCoefficients {
+    /// Feedforward coefficient b0.
     pub b0: f64,
+    /// Feedforward coefficient b1 (z^-1 term).
     pub b1: f64,
+    /// Feedforward coefficient b2 (z^-2 term).
     pub b2: f64,
+    /// Feedback coefficient a1 (z^-1 term).
     pub a1: f64,
+    /// Feedback coefficient a2 (z^-2 term).
     pub a2: f64,
 }
 

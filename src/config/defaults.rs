@@ -1,5 +1,11 @@
+//! Default configuration values and built-in preset definitions.
+//!
+//! Provides the factory-default `AppConfig` and the five built-in presets
+//! (stealth, stealth-plus, fast, quality, research).
+
 use crate::config::types::*;
 
+/// Create a new `AppConfig` with sensible default values.
 pub fn default_config() -> AppConfig {
     AppConfig {
         version: "2.0.0".to_string(),
@@ -88,16 +94,21 @@ pub fn default_config() -> AppConfig {
     }
 }
 
-/// Built-in preset: partial config overrides.
-/// Returns (paranoia_level, preserve_quality, advanced_flags_override, description).
+/// Built-in preset definition with partial config overrides.
 pub struct PresetDef {
+    /// Unique preset identifier used on the CLI.
     pub name: &'static str,
+    /// Human-readable description of the preset's purpose.
     pub description: &'static str,
+    /// Paranoia level override applied by this preset.
     pub paranoia_level: ParanoiaLevel,
+    /// Quality level override applied by this preset.
     pub preserve_quality: QualityLevel,
+    /// Optional advanced flag overrides; `None` keeps defaults.
     pub advanced_flags: Option<AdvancedFlags>,
 }
 
+/// Return the list of all built-in presets.
 pub fn builtin_presets() -> Vec<PresetDef> {
     vec![
         PresetDef {

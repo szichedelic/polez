@@ -1,19 +1,31 @@
+//! Audio file loading and saving.
+//!
+//! Supports WAV (hound), MP3 (mp3lame), FLAC (flacenc), OGG Vorbis (vorbis_rs),
+//! and AAC decoding (symphonia). Format detection uses magic bytes with extension fallback.
+
 use std::io::Read;
 use std::path::Path;
 
 use crate::audio::AudioBuffer;
 use crate::error::{PolezError, Result};
 
+/// Supported audio file formats for loading and saving.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudioFormat {
+    /// Waveform Audio File Format.
     Wav,
+    /// MPEG Audio Layer III.
     Mp3,
+    /// Free Lossless Audio Codec.
     Flac,
+    /// Ogg Vorbis.
     Ogg,
+    /// Advanced Audio Coding (decode only).
     Aac,
 }
 
 impl AudioFormat {
+    /// Returns the canonical file extension for this format.
     pub fn extension(&self) -> &str {
         match self {
             AudioFormat::Wav => "wav",

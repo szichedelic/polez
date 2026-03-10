@@ -1,3 +1,8 @@
+//! Fingerprint removal through statistical normalization and pattern disruption.
+//!
+//! Targets AI-generated statistical signatures by adjusting kurtosis, adding
+//! temporal jitter, randomizing phase, and injecting human-like imperfections.
+
 use rand::Rng;
 use rand_distr::{Distribution, Normal};
 

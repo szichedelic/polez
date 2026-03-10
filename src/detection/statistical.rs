@@ -1,3 +1,8 @@
+//! Statistical analysis for detecting AI-generated audio.
+//!
+//! Computes entropy, kurtosis, spectral features, temporal patterns, and
+//! AI-specific indicators to estimate the probability that audio was machine-generated.
+
 use std::collections::HashMap;
 
 use serde::Serialize;
@@ -8,47 +13,75 @@ use crate::sanitization::dsp::{stats, stft};
 /// Statistical analysis result.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct StatisticalResult {
+    /// Estimated probability that the audio is AI-generated (0.0 to 1.0).
     pub ai_probability: f64,
+    /// Complement of `ai_probability` (1.0 - ai_probability).
     pub human_confidence: f64,
+    /// Statistical anomalies found in the audio.
     pub anomalies: Vec<Anomaly>,
+    /// Computed feature values keyed by feature name.
     pub features: HashMap<String, f64>,
+    /// Temporal pattern analysis results.
     pub temporal: TemporalAnalysis,
+    /// Spectral pattern analysis results.
     pub spectral: SpectralAnalysis,
+    /// AI-specific generation indicators.
     pub ai_indicators: AiIndicators,
 }
 
 /// Specific AI generation indicators.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct AiIndicators {
+    /// How smooth the spectrogram is frame-to-frame (higher = more AI-like).
     pub spectral_continuity: f64,
+    /// Score for periodic micro-silence patterns at chunk boundaries.
     pub micro_silence_score: f64,
+    /// How consistent overtone ratios are across frames (higher = more AI-like).
     pub harmonic_regularity: f64,
+    /// How precise onset timing is (higher = more machine-like).
     pub onset_machine_score: f64,
+    /// Human-readable descriptions of detected AI indicators.
     pub indicators_found: Vec<String>,
 }
 
+/// A detected statistical anomaly in the audio signal.
 #[derive(Debug, Clone, Serialize)]
 pub struct Anomaly {
+    /// Category of the anomaly (e.g., "low_entropy", "abnormal_kurtosis").
     pub anomaly_type: String,
+    /// Severity level: "low", "medium", or "high".
     pub severity: String,
+    /// Human-readable description of the anomaly.
     pub description: String,
+    /// The measured value that triggered the anomaly.
     pub value: f64,
 }
 
+/// Temporal pattern analysis of onset timing and entropy.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct TemporalAnalysis {
+    /// How regular onset intervals are (0.0 = irregular, 1.0 = perfectly regular).
     pub onset_regularity: f64,
+    /// Number of detected onsets.
     pub onset_count: usize,
+    /// Shannon entropy of the temporal amplitude distribution.
     pub temporal_entropy: f64,
+    /// Whether the temporal patterns are suspicious for AI generation.
     pub suspicious: bool,
 }
 
+/// Spectral pattern analysis of frequency-domain features over time.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SpectralAnalysis {
+    /// Variance of spectral centroid across STFT frames.
     pub centroid_variance: f64,
+    /// Variance of spectral rolloff across STFT frames.
     pub rolloff_variance: f64,
+    /// Mean spectral flatness across frames.
     pub flatness_mean: f64,
+    /// Ratio of low-frequency to total energy.
     pub harmonic_ratio: f64,
+    /// Whether the spectral patterns are suspicious for AI generation.
     pub suspicious: bool,
 }
 

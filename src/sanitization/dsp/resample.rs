@@ -1,3 +1,8 @@
+//! Sample rate conversion using FFT-based resampling.
+//!
+//! Uses rubato's FFT resampler for high-quality conversion with a linear
+//! interpolation fallback when the primary resampler cannot be initialized.
+
 use rubato::{FftFixedInOut, Resampler};
 
 /// Resample a mono signal from one sample rate to another using rubato.

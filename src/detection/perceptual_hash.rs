@@ -1,3 +1,8 @@
+//! Chroma-based perceptual audio hashing and comparison.
+//!
+//! Generates compact fingerprints from audio content that are robust to amplitude
+//! scaling, and compares them using Hamming distance for similarity scoring.
+
 use serde::Serialize;
 
 use crate::audio::AudioBuffer;
@@ -9,18 +14,26 @@ const CHROMA_BINS: usize = 12;
 /// Result of perceptual hashing for a single file.
 #[derive(Debug, Clone, Serialize)]
 pub struct PerceptualHash {
+    /// Packed hash words (32 bits each) derived from chroma frame comparisons.
     pub hash: Vec<u32>,
+    /// Duration of the source audio in seconds.
     pub duration_secs: f64,
+    /// Sample rate of the source audio.
     pub sample_rate: u32,
 }
 
 /// Result of comparing two perceptual hashes.
 #[derive(Debug, Clone, Serialize)]
 pub struct HashComparison {
+    /// Path or identifier of the first file.
     pub file_a: String,
+    /// Path or identifier of the second file.
     pub file_b: String,
+    /// Similarity score between the two hashes (0.0 to 1.0).
     pub similarity: f64,
+    /// Number of hash words in the first file's hash.
     pub hash_length_a: usize,
+    /// Number of hash words in the second file's hash.
     pub hash_length_b: usize,
 }
 

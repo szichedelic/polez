@@ -1,8 +1,13 @@
+//! Hilbert transform and envelope extraction.
+//!
+//! Computes the analytic signal representation and amplitude envelope
+//! of real-valued audio signals using FFT-based Hilbert transform.
+
 use num_complex::Complex;
 use rustfft::FftPlanner;
 
 /// Compute the Hilbert transform of a real signal, returning the analytic signal.
-/// analytic[i] = signal[i] + j * hilbert(signal[i])
+/// `analytic[i] = signal[i] + j * hilbert(signal[i])`
 pub fn hilbert(signal: &[f32]) -> Vec<Complex<f32>> {
     let n = signal.len();
     if n == 0 {

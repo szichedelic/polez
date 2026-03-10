@@ -1,3 +1,8 @@
+//! Zero-phase forward-backward digital filtering.
+//!
+//! Equivalent to `scipy.signal.filtfilt`, applying a biquad filter in both
+//! directions to eliminate phase distortion while doubling the filter order.
+
 use super::biquad::{biquad_process, BiquadCoefficients};
 
 /// Zero-phase forward-backward filtering (equivalent to scipy.signal.filtfilt).

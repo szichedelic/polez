@@ -1,3 +1,9 @@
+//! Statistical analysis functions for audio signal processing.
+//!
+//! Provides descriptive statistics (mean, std dev, skewness, kurtosis),
+//! spectral features (centroid, flatness, rolloff), and signal analysis
+//! utilities (zero-crossing rate, RMS, autocorrelation, peak detection).
+
 /// Compute the mean of a slice.
 pub fn mean(data: &[f32]) -> f64 {
     if data.is_empty() {
@@ -182,7 +188,9 @@ pub fn autocorrelation(signal: &[f32]) -> Vec<f64> {
 /// A detected peak with index and value.
 #[derive(Debug, Clone)]
 pub struct Peak {
+    /// Position of the peak in the input data.
     pub index: usize,
+    /// Amplitude of the peak.
     pub value: f64,
 }
 

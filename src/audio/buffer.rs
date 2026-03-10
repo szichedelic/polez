@@ -1,3 +1,8 @@
+//! Core audio buffer type for multi-channel f32 sample storage.
+//!
+//! [`AudioBuffer`] wraps an ndarray `Array2<f32>` with shape `(num_samples, num_channels)`
+//! and provides constructors, format conversions, and DSP utility methods.
+
 use ndarray::Array2;
 use zeroize::Zeroize;
 
@@ -5,11 +10,14 @@ use zeroize::Zeroize;
 /// Shape: (num_samples, num_channels)
 #[derive(Debug, Clone)]
 pub struct AudioBuffer {
+    /// Sample data as a 2D array with shape `(num_samples, num_channels)`.
     pub samples: Array2<f32>,
+    /// Sample rate in Hz (e.g., 44100, 48000).
     pub sample_rate: u32,
 }
 
 impl AudioBuffer {
+    /// Create a buffer from a pre-built 2D sample array.
     pub fn new(samples: Array2<f32>, sample_rate: u32) -> Self {
         Self {
             samples,
@@ -58,22 +66,27 @@ impl AudioBuffer {
         }
     }
 
+    /// Returns the number of samples (frames) in the buffer.
     pub fn num_samples(&self) -> usize {
         self.samples.nrows()
     }
 
+    /// Returns the number of audio channels.
     pub fn num_channels(&self) -> usize {
         self.samples.ncols()
     }
 
+    /// Returns the duration of the audio in seconds.
     pub fn duration_secs(&self) -> f64 {
         self.num_samples() as f64 / self.sample_rate as f64
     }
 
+    /// Returns `true` if the buffer has exactly one channel.
     pub fn is_mono(&self) -> bool {
         self.num_channels() == 1
     }
 
+    /// Returns `true` if the buffer has exactly two channels.
     pub fn is_stereo(&self) -> bool {
         self.num_channels() == 2
     }
@@ -105,7 +118,7 @@ impl AudioBuffer {
         AudioBuffer::from_mono(mono, self.sample_rate)
     }
 
-    /// Get mono samples as a Vec<f32>.
+    /// Get mono samples as a `Vec<f32>`.
     pub fn to_mono_samples(&self) -> Vec<f32> {
         if self.is_mono() {
             self.samples.column(0).to_vec()

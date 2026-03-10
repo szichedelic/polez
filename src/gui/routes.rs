@@ -1,3 +1,8 @@
+//! Axum route handlers for the GUI REST API.
+//!
+//! Provides endpoints for file upload, analysis, waveform/spectrogram data,
+//! sanitization, verification, preset management, and batch processing.
+
 use axum::extract::DefaultBodyLimit;
 use axum::http::HeaderValue;
 use axum::{

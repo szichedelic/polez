@@ -1,30 +1,40 @@
+//! Formatted console output for analysis results, sanitization reports,
+//! and configuration display.
+
 use colored::Colorize;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 
+/// Manages styled console output for all CLI display needs.
 pub struct ConsoleManager;
 
 impl ConsoleManager {
+    /// Create a new console manager.
     pub fn new() -> Self {
         Self
     }
 
+    /// Print a green success message.
     pub fn success(&self, msg: &str) {
         println!("{}", msg.green().bold());
     }
 
+    /// Print a red error message.
     pub fn error(&self, msg: &str) {
         println!("{}", msg.red().bold());
     }
 
+    /// Print a yellow warning message.
     pub fn warning(&self, msg: &str) {
         println!("{}", msg.yellow().bold());
     }
 
+    /// Print a cyan informational message.
     pub fn info(&self, msg: &str) {
         println!("{}", msg.cyan().bold());
     }
 
+    /// Print a random themed quote in magenta italic.
     pub fn hacker_quote(&self) {
         let quotes = [
             "In the symphony of digital rights, we are the conductors of chaos.",
@@ -54,6 +64,7 @@ impl ConsoleManager {
         }
     }
 
+    /// Display formatted audio analysis results including watermark detection and AI probability.
     pub fn display_analysis(&self, analysis: &AnalysisDisplay) {
         println!();
         println!("{}", "=== Audio Analysis Results ===".blue().bold());
@@ -121,6 +132,7 @@ impl ConsoleManager {
         println!();
     }
 
+    /// Display sanitization pipeline results (metadata removed, patterns suppressed, etc.).
     pub fn display_results(&self, results: &SanitizationDisplay) {
         println!();
         println!("{}", "=== Sanitization Results ===".green().bold());
@@ -141,6 +153,7 @@ impl ConsoleManager {
         println!();
     }
 
+    /// Display before/after verification results with SNR, spectral similarity, and verdict.
     pub fn display_verification(&self, v: &VerificationDisplay) {
         println!();
         println!("{}", "=== Verification Results ===".blue().bold());
@@ -210,6 +223,7 @@ impl ConsoleManager {
         println!();
     }
 
+    /// Display configuration as a list of key-value pairs.
     pub fn display_config(&self, items: &[(String, String)]) {
         println!();
         println!("{}", "=== Configuration ===".blue().bold());
@@ -219,6 +233,7 @@ impl ConsoleManager {
         println!();
     }
 
+    /// Display configuration from a HashMap, sorted by key.
     pub fn display_config_map(&self, config: &HashMap<String, String>) {
         println!();
         println!("{}", "=== Configuration ===".blue().bold());
@@ -230,6 +245,7 @@ impl ConsoleManager {
         println!();
     }
 
+    /// Display batch processing summary with success/failure counts and timing.
     pub fn display_batch_summary(&self, summary: &BatchSummaryDisplay) {
         println!();
         println!("{}", "=== Batch Processing Summary ===".green().bold());
@@ -270,46 +286,82 @@ impl ConsoleManager {
 
 // Display data structs
 
+/// Data for rendering audio analysis results in the console.
 pub struct AnalysisDisplay {
+    /// Path to the analyzed file.
     pub file_path: String,
+    /// Audio format (e.g. "WAV", "MP3").
     pub format: String,
+    /// Total duration in seconds.
     pub duration_secs: f64,
+    /// Sample rate in Hz.
     pub sample_rate: u32,
+    /// Number of audio channels.
     pub channels: usize,
+    /// Number of metadata tags found.
     pub metadata_tags: usize,
+    /// Number of suspicious binary chunks.
     pub suspicious_chunks: usize,
+    /// Total threats detected.
     pub threats_found: usize,
+    /// Threat severity label (e.g. "HIGH", "MEDIUM", "LOW").
     pub threat_level: String,
+    /// Per-method watermark results: (method name, detected, confidence).
     pub watermark_results: Option<Vec<(String, bool, f64)>>,
+    /// Estimated probability the audio is AI-generated.
     pub ai_probability: Option<f64>,
 }
 
+/// Data for rendering sanitization results in the console.
 pub struct SanitizationDisplay {
+    /// Whether sanitization completed without error.
     pub success: bool,
+    /// Number of metadata tags removed.
     pub metadata_removed: usize,
+    /// Number of watermark patterns detected.
     pub patterns_found: usize,
+    /// Number of patterns successfully suppressed.
     pub patterns_suppressed: usize,
+    /// Estimated quality loss as a percentage.
     pub quality_loss: f64,
+    /// Wall-clock processing time in seconds.
     pub processing_time: f64,
+    /// Path to the sanitized output file.
     pub output_file: Option<String>,
 }
 
+/// Data for rendering before/after verification results.
 pub struct VerificationDisplay {
+    /// Threats detected in the original file.
     pub original_threats: usize,
+    /// Threats remaining in the cleaned file.
     pub remaining_threats: usize,
+    /// Percentage of threats removed.
     pub removal_effectiveness: f64,
+    /// Whether the file hash changed after cleaning.
     pub hash_different: bool,
+    /// Signal-to-noise ratio in dB (original vs. cleaned).
     pub snr_db: Option<f64>,
+    /// Pearson correlation of FFT magnitudes.
     pub spectral_similarity: Option<f64>,
+    /// Combined quality preservation score (0.0 - 1.0).
     pub quality_score: Option<f64>,
+    /// Verdict text and color name (e.g. ("EXCELLENT", "green")).
     pub verdict: Option<(String, String)>,
 }
 
+/// Data for rendering batch processing summary.
 pub struct BatchSummaryDisplay {
+    /// Total files processed.
     pub total: usize,
+    /// Number of successfully processed files.
     pub success: usize,
+    /// Number of files that failed.
     pub failed: usize,
+    /// Total wall-clock time in seconds.
     pub total_time: f64,
+    /// Output directory path.
     pub output_dir: Option<String>,
+    /// List of (filename, error message) for failed files.
     pub failed_files: Vec<(String, String)>,
 }

@@ -1,3 +1,7 @@
+//! Configuration management for polez.
+//!
+//! Provides YAML-based configuration, built-in presets, and environment variable overrides.
+
 pub mod defaults;
 pub mod manager;
 pub mod types;

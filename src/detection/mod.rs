@@ -1,3 +1,8 @@
+//! Watermark and fingerprint detection algorithms.
+//!
+//! This module provides multiple detection strategies for identifying watermarks,
+//! statistical anomalies, metadata fingerprints, and AI-generated audio characteristics.
+
 pub mod metadata_scan;
 pub mod perceptual_hash;
 pub mod polez;

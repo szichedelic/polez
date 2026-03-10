@@ -1,3 +1,8 @@
+//! Unified sanitization pipeline that orchestrates all cleaning stages.
+//!
+//! Replaces the five separate Python sanitizer scripts from the prior version
+//! with a single configurable pipeline supporting four processing modes.
+
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -27,12 +32,19 @@ pub enum SanitizationMode {
 /// Result of a sanitization run.
 #[derive(Debug, Clone)]
 pub struct SanitizationResult {
+    /// Whether the sanitization completed without errors.
     pub success: bool,
+    /// Path to the sanitized output file.
     pub output_file: PathBuf,
+    /// Number of metadata tags removed.
     pub metadata_removed: usize,
+    /// Number of watermark/fingerprint patterns detected.
     pub patterns_found: usize,
+    /// Number of patterns successfully suppressed.
     pub patterns_suppressed: usize,
+    /// Estimated quality loss as a percentage of original RMS.
     pub quality_loss: f64,
+    /// Wall-clock processing time in seconds.
     pub processing_time: f64,
 }
 
@@ -50,6 +62,7 @@ pub struct SanitizationPipeline {
 }
 
 impl SanitizationPipeline {
+    /// Create a new sanitization pipeline with the given configuration.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         mode: SanitizationMode,
@@ -229,6 +242,7 @@ impl SanitizationPipeline {
         Ok((joined, total_found, total_suppressed))
     }
 
+    /// Standard mode: spectral cleaning + fingerprint removal.
     fn run_standard(&self, buffer: &mut AudioBuffer) -> Result<(usize, usize)> {
         let (found, suppressed) =
             SpectralCleaner::clean(buffer, self.paranoid, &self.flags, &self.freq_ranges)?;
@@ -236,6 +250,7 @@ impl SanitizationPipeline {
         Ok((found, suppressed))
     }
 
+    /// Preserving mode: spectral cleaning + fingerprint removal + stealth ops.
     fn run_preserving(&self, buffer: &mut AudioBuffer) -> Result<(usize, usize)> {
         let (found, suppressed) =
             SpectralCleaner::clean(buffer, self.paranoid, &self.flags, &self.freq_ranges)?;
@@ -244,6 +259,7 @@ impl SanitizationPipeline {
         Ok((found, suppressed))
     }
 
+    /// Aggressive mode: all cleaning with forced paranoid settings.
     fn run_aggressive(&self, buffer: &mut AudioBuffer) -> Result<(usize, usize)> {
         let (found, suppressed) =
             SpectralCleaner::clean(buffer, true, &self.flags, &self.freq_ranges)?;

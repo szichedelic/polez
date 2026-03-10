@@ -1,3 +1,8 @@
+//! Web-based forensics GUI backend.
+//!
+//! Serves an embedded React SPA via `rust-embed` and exposes REST API
+//! endpoints through an Axum server for audio analysis and sanitization.
+
 mod routes;
 mod types;
 
@@ -7,6 +12,7 @@ use tokio::sync::RwLock;
 
 use crate::audio::AudioBuffer;
 
+/// Embedded frontend assets from `gui/dist/`.
 #[derive(rust_embed::RustEmbed)]
 #[folder = "gui/dist/"]
 pub(crate) struct Assets;
@@ -15,10 +21,15 @@ pub(crate) struct Assets;
 /// Avoids recomputing downsampled waveform on every request.
 #[derive(Clone)]
 pub struct WaveformCache {
+    /// Per-chunk minimum sample values.
     pub min: Vec<f32>,
+    /// Per-chunk maximum sample values.
     pub max: Vec<f32>,
+    /// Total audio duration in seconds.
     pub duration_secs: f64,
+    /// Audio sample rate in Hz.
     pub sample_rate: u32,
+    /// Number of audio channels.
     pub channels: usize,
 }
 
@@ -109,12 +120,19 @@ impl WaveformCache {
     }
 }
 
+/// Server-side state holding loaded and cleaned audio buffers.
 pub struct AppState {
+    /// Currently loaded original audio buffer.
     pub buffer: Option<AudioBuffer>,
+    /// Path of the loaded original file.
     pub file_path: Option<String>,
+    /// Detected audio format of the original file.
     pub format: Option<String>,
+    /// Audio buffer after sanitization.
     pub cleaned_buffer: Option<AudioBuffer>,
+    /// Path of the cleaned output file.
     pub cleaned_file_path: Option<String>,
+    /// Audio format of the cleaned file.
     pub cleaned_format: Option<String>,
     /// Pre-computed waveform overview for original audio
     pub waveform_cache: Option<WaveformCache>,
@@ -125,6 +143,7 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Create empty application state with no loaded audio.
     pub fn new() -> Self {
         Self {
             buffer: None,
@@ -148,8 +167,10 @@ impl Drop for AppState {
     }
 }
 
+/// Thread-safe shared application state.
 pub type SharedState = Arc<RwLock<AppState>>;
 
+/// Start the Axum HTTP server on the given port and optionally open a browser.
 pub async fn start_server(port: u16, no_open: bool) -> Result<()> {
     let state: SharedState = Arc::new(RwLock::new(AppState::new()));
     let app = routes::create_router(state);

@@ -1,3 +1,8 @@
+//! Short-Time Fourier Transform (STFT) and inverse STFT.
+//!
+//! Provides windowed FFT analysis and overlap-add synthesis for frequency-domain
+//! audio processing, plus convenience wrappers for real-valued FFT/IFFT.
+
 use num_complex::Complex;
 use rustfft::FftPlanner;
 use std::f32::consts::PI;

@@ -119,7 +119,7 @@ pub fn add_into(dst: &mut [f32], src: &[f32]) {
     }
 }
 
-/// Multiply-accumulate: dst[i] += a[i] * b[i] for overlap-add with windowing.
+/// Multiply-accumulate: `dst[i] += a[i] * b[i]` for overlap-add with windowing.
 #[inline]
 pub fn multiply_accumulate(dst: &mut [f32], a: &[f32], b: &[f32]) {
     let len = dst.len().min(a.len()).min(b.len());
@@ -139,7 +139,7 @@ pub fn multiply_accumulate(dst: &mut [f32], a: &[f32], b: &[f32]) {
     }
 }
 
-/// Squared accumulate: dst[i] += a[i] * a[i] (for window_sum in ISTFT).
+/// Squared accumulate: `dst[i] += a[i] * a[i]` (for window_sum in ISTFT).
 #[inline]
 pub fn square_accumulate(dst: &mut [f32], a: &[f32]) {
     let len = dst.len().min(a.len());

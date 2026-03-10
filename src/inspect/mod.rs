@@ -37,13 +37,18 @@ fn intensity_to_rgb(normalized: f64) -> (u8, u8, u8) {
 
 /// Spectrogram visualization for high-frequency watermark detection.
 pub struct SpectrogramView {
+    /// Lower frequency bound in Hz.
     pub freq_min: u32,
+    /// Upper frequency bound in Hz.
     pub freq_max: u32,
+    /// Start time offset in seconds.
     pub start_secs: f64,
+    /// Duration to visualize in seconds (0 = auto).
     pub duration_secs: f64,
 }
 
 impl SpectrogramView {
+    /// Create a spectrogram view for the given frequency range and time window.
     pub fn new(freq_min: u32, freq_max: u32, start_secs: f64, duration_secs: f64) -> Self {
         Self {
             freq_min,
@@ -430,13 +435,18 @@ impl SpectrogramView {
 
 /// Bit pattern visualization for LSB watermark detection.
 pub struct BitsView {
+    /// Which bit plane to analyze (0 = LSB, 7 = MSB).
     pub bit_plane: u8,
+    /// Starting sample offset.
     pub offset: usize,
+    /// Number of samples to analyze.
     pub count: usize,
+    /// Whether to search for ASCII strings in the bit stream.
     pub search_strings: bool,
 }
 
 impl BitsView {
+    /// Create a bit-plane view with the given parameters.
     pub fn new(bit_plane: u8, offset: usize, count: usize, search_strings: bool) -> Self {
         Self {
             bit_plane,

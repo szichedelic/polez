@@ -1,17 +1,28 @@
+//! Configuration file I/O, validation, and preset management.
+//!
+//! [`ConfigManager`] handles loading/saving YAML config, applying environment
+//! variable overrides, validating settings, and managing custom presets.
+
 use std::path::{Path, PathBuf};
 
 use crate::config::defaults::{builtin_presets, default_config};
 use crate::config::types::AppConfig;
 use crate::error::{PolezError, Result};
 
+/// Manages configuration loading, saving, validation, and preset operations.
 pub struct ConfigManager {
+    /// Directory containing config and preset files.
     config_dir: PathBuf,
+    /// Path to the main config YAML file.
     config_file: PathBuf,
+    /// The currently loaded configuration.
     pub config: AppConfig,
+    /// Log of environment variable overrides that were applied.
     pub env_overrides: Vec<String>,
 }
 
 impl ConfigManager {
+    /// Create a new `ConfigManager`, loading config from disk and applying env overrides.
     pub fn new() -> Result<Self> {
         let config_dir = get_config_dir()?;
         let config_file = config_dir.join("config.yaml");
@@ -26,6 +37,7 @@ impl ConfigManager {
         Ok(mgr)
     }
 
+    /// Load configuration from the YAML file, falling back to defaults on error.
     pub fn load(&mut self) -> Result<()> {
         if self.config_file.exists() {
             let contents = std::fs::read_to_string(&self.config_file)
@@ -252,6 +264,7 @@ impl ConfigManager {
         warnings
     }
 
+    /// Save the current configuration to the YAML file.
     pub fn save(&self) -> Result<()> {
         std::fs::create_dir_all(&self.config_dir)
             .map_err(|e| PolezError::Config(format!("Failed to create config dir: {e}")))?;
@@ -262,11 +275,13 @@ impl ConfigManager {
         Ok(())
     }
 
+    /// Reset configuration to factory defaults and save.
     pub fn reset_to_defaults(&mut self) -> Result<()> {
         self.config = default_config();
         self.save()
     }
 
+    /// Apply a built-in or custom preset by name, saving the result.
     pub fn apply_preset(&mut self, name: &str) -> Result<()> {
         // Check built-in presets
         if let Some(preset) = builtin_presets().into_iter().find(|p| p.name == name) {
@@ -296,6 +311,7 @@ impl ConfigManager {
         Err(PolezError::Config(format!("Preset '{name}' not found")))
     }
 
+    /// Save a configuration as a custom preset file.
     pub fn create_preset(&self, name: &str, config: &AppConfig) -> Result<()> {
         let preset_path = self.config_dir.join(format!("preset_{name}.yaml"));
         let yaml = serde_yaml::to_string(config)
@@ -305,6 +321,7 @@ impl ConfigManager {
         Ok(())
     }
 
+    /// Delete a custom preset file. Built-in presets cannot be deleted.
     pub fn delete_preset(&self, name: &str) -> Result<()> {
         // Don't allow deleting built-in presets
         if builtin_presets().iter().any(|p| p.name == name) {
@@ -322,6 +339,7 @@ impl ConfigManager {
         }
     }
 
+    /// List names of all user-created custom presets.
     pub fn list_custom_presets(&self) -> Vec<String> {
         let mut presets = Vec::new();
         if let Ok(entries) = std::fs::read_dir(&self.config_dir) {
@@ -341,6 +359,7 @@ impl ConfigManager {
         presets
     }
 
+    /// Return the path to the configuration directory.
     pub fn config_dir(&self) -> &Path {
         &self.config_dir
     }
@@ -348,8 +367,11 @@ impl ConfigManager {
 
 /// A validation issue found in the config.
 pub struct ConfigIssue {
+    /// Dot-separated path to the offending config field.
     pub field: String,
+    /// Human-readable description of the issue.
     pub message: String,
+    /// `true` for critical errors, `false` for warnings.
     pub is_error: bool,
 }
 
@@ -406,6 +428,7 @@ fn edit_distance(a: &str, b: &str) -> usize {
     dp[a.len()][b.len()]
 }
 
+/// Determine the platform-appropriate configuration directory and ensure it exists.
 fn get_config_dir() -> Result<PathBuf> {
     let base = if cfg!(target_os = "windows") {
         dirs::data_local_dir()

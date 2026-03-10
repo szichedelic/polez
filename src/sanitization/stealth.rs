@@ -1,3 +1,9 @@
+//! Advanced stealth DSP operations for audio fingerprint disruption.
+//!
+//! Contains 20 flag-gated operations ranging from phase noise injection and
+//! resampling warps to transient micro-shifts and comb masking. Each operation
+//! uses paranoid/normal parameter pairs for intensity control.
+
 use num_complex::Complex;
 use rand::Rng;
 use rand_distr::{Distribution, Normal};

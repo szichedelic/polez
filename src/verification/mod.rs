@@ -1,3 +1,8 @@
+//! Post-sanitization verification comparing original and cleaned audio.
+//!
+//! Computes threat removal effectiveness, SNR, spectral similarity, and an
+//! overall quality preservation score.
+
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
@@ -11,14 +16,23 @@ use crate::sanitization::dsp::stft;
 /// Verification result comparing before/after sanitization.
 #[derive(Debug, Clone)]
 pub struct VerificationResult {
+    /// Number of threats detected in the original file.
     pub original_threats: usize,
+    /// Number of threats remaining after cleaning.
     pub remaining_threats: usize,
+    /// Percentage of threats successfully removed (0-100).
     pub removal_effectiveness: f64,
+    /// Whether the file hash changed after sanitization.
     pub hash_different: bool,
+    /// SHA-256 hash of the original file.
     pub original_hash: String,
+    /// SHA-256 hash of the cleaned file.
     pub cleaned_hash: String,
+    /// Signal-to-noise ratio in dB between original and cleaned audio.
     pub snr_db: f64,
+    /// Pearson correlation of FFT magnitudes between original and cleaned.
     pub spectral_similarity: f64,
+    /// Combined quality preservation score (0.0 - 1.0).
     pub quality_score: f64,
 }
 

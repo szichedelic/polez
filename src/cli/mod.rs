@@ -1,3 +1,8 @@
+//! Command-line interface definitions using `clap` derive macros.
+//!
+//! Defines the top-level `Cli` parser, all subcommands via `Commands`,
+//! and supporting enums for format, paranoia, and quality choices.
+
 pub mod flags;
 
 use clap::{Parser, Subcommand, ValueEnum};
@@ -5,6 +10,7 @@ use std::path::PathBuf;
 
 pub use flags::{AdvancedFlagsCli, FingerprintFlagsCli};
 
+/// Top-level CLI parser for the `polez` binary.
 #[derive(Parser)]
 #[command(
     name = "polez",
@@ -29,6 +35,7 @@ pub struct Cli {
     pub command: Commands,
 }
 
+/// All available CLI subcommands.
 #[derive(Subcommand)]
 pub enum Commands {
     /// Sanitize all traces from a single audio file
@@ -308,6 +315,7 @@ Examples:
     Version,
 }
 
+/// Actions for the `config` subcommand.
 #[derive(Subcommand)]
 pub enum ConfigAction {
     /// Show current configuration
@@ -361,29 +369,46 @@ pub enum ConfigAction {
     Validate,
 }
 
+/// Output audio format selection.
 #[derive(Clone, Copy, ValueEnum)]
 pub enum FormatChoice {
+    /// Keep the original format.
     Preserve,
+    /// MPEG-1 Audio Layer 3.
     Mp3,
+    /// Waveform Audio File Format.
     Wav,
+    /// Free Lossless Audio Codec.
     Flac,
+    /// Ogg Vorbis.
     Ogg,
+    /// Advanced Audio Coding.
     Aac,
 }
 
+/// Paranoia (destruction intensity) level selection.
 #[derive(Clone, Copy, ValueEnum)]
 pub enum ParanoiaChoice {
+    /// Minimal processing, fastest.
     Low,
+    /// Balanced cleaning.
     Medium,
+    /// Thorough cleaning with moderate quality impact.
     High,
+    /// Maximum destruction, multiple passes.
     Maximum,
 }
 
+/// Quality preservation level selection.
 #[derive(Clone, Copy, ValueEnum)]
 pub enum QualityChoice {
+    /// Prioritize speed over quality.
     Low,
+    /// Balanced quality preservation.
     Medium,
+    /// High quality preservation (default).
     High,
+    /// Maximum quality preservation, slowest.
     Maximum,
 }
 

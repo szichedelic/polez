@@ -1,3 +1,8 @@
+//! Audio sanitization pipeline and cleaning modules.
+//!
+//! Orchestrates metadata stripping, spectral cleaning, fingerprint removal,
+//! and stealth DSP operations to remove watermarks and fingerprints from audio.
+
 pub mod dsp;
 pub mod fingerprint;
 pub mod metadata;

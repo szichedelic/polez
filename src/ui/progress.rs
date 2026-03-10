@@ -1,3 +1,5 @@
+//! Progress bar and spinner utilities built on `indicatif`.
+
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::time::Duration;
 
