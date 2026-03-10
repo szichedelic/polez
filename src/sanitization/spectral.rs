@@ -22,6 +22,11 @@ pub struct SpectralCleaner;
 
 impl SpectralCleaner {
     /// Run all spectral cleaning methods. Returns (patterns_found, patterns_suppressed).
+    ///
+    /// Computes STFT once per channel, applies all spectral modifications to the
+    /// shared spectrogram, then reconstructs via a single ISTFT. This avoids
+    /// redundant FFT work across periodic disruption, spectral smoothing, and
+    /// spread-spectrum attenuation.
     pub fn clean(
         buffer: &mut AudioBuffer,
         paranoid: bool,
@@ -35,6 +40,7 @@ impl SpectralCleaner {
         for ch in 0..buffer.num_channels() {
             let channel: Vec<f32> = buffer.channel(ch).to_vec();
 
+            // Detection pass uses different overlap, kept separate
             let (f1, s1) = remove_high_frequency_watermarks(&channel, sr);
             let mut cleaned = if s1 > 0 {
                 notch_watermark_bands(&channel, sr)
@@ -44,13 +50,31 @@ impl SpectralCleaner {
             found += f1;
             suppressed += s1;
 
-            let (f2, s2) = disrupt_periodic_patterns(&mut cleaned, sr, paranoid);
-            found += f2;
-            suppressed += s2;
+            // Single STFT for all spectral modification passes
+            let nperseg = 2048.min(cleaned.len() / 4).max(256);
+            let noverlap = nperseg * 3 / 4;
+            let (mut spectrogram, orig_len) = stft::stft(&cleaned, nperseg, noverlap);
 
-            spectral_smoothing(&mut cleaned, sr);
+            if !spectrogram.is_empty() {
+                let freq_resolution = sr as f64 / nperseg as f64;
+                let high_freq_start = (15000.0 / freq_resolution) as usize;
+
+                let (f2, s2) =
+                    apply_periodic_disruption(&mut spectrogram, high_freq_start, paranoid);
+                found += f2;
+                suppressed += s2;
+
+                apply_spectral_smoothing(&mut spectrogram, high_freq_start);
+                apply_spread_spectrum_attenuation(&mut spectrogram, high_freq_start);
+
+                // Single ISTFT reconstruction
+                let reconstructed = stft::istft(&spectrogram, nperseg, noverlap, orig_len);
+                let copy_len = cleaned.len().min(reconstructed.len());
+                cleaned[..copy_len].copy_from_slice(&reconstructed[..copy_len]);
+            }
+
+            // Noise shaping operates in time domain, no STFT needed
             adaptive_noise_shaping(&mut cleaned, sr, paranoid);
-            spread_spectrum_attenuation(&mut cleaned, sr);
 
             let mut ch_view = buffer.channel_mut(ch);
             for (i, &val) in cleaned.iter().enumerate().take(ch_view.len()) {
@@ -163,23 +187,18 @@ fn notch_watermark_bands(channel: &[f32], sr: u32) -> Vec<f32> {
     output
 }
 
-/// Disrupt periodic patterns by randomizing phase in the STFT domain.
-fn disrupt_periodic_patterns(channel: &mut [f32], sr: u32, paranoid: bool) -> (usize, usize) {
-    let nperseg = 2048.min(channel.len() / 4).max(256);
-    let noverlap = nperseg * 3 / 4;
-    let (mut spectrogram, orig_len) = stft::stft(channel, nperseg, noverlap);
-
-    if spectrogram.is_empty() {
-        return (0, 0);
-    }
-
+/// Disrupt periodic patterns by randomizing phase in high-frequency bins.
+/// Operates on an already-computed spectrogram (no STFT/ISTFT).
+fn apply_periodic_disruption(
+    spectrogram: &mut [Vec<Complex<f32>>],
+    high_freq_start: usize,
+    paranoid: bool,
+) -> (usize, usize) {
     let mut rng = rand::thread_rng();
     let phase_noise = if paranoid { 0.05 } else { 0.02 };
-    let freq_resolution = sr as f64 / nperseg as f64;
-    let high_freq_start = (15000.0 / freq_resolution) as usize;
     let mut found = 0;
 
-    for frame in &mut spectrogram {
+    for frame in spectrogram.iter_mut() {
         for val in frame.iter_mut().skip(high_freq_start) {
             let mag = val.norm();
             let phase = val.arg();
@@ -189,33 +208,20 @@ fn disrupt_periodic_patterns(channel: &mut [f32], sr: u32, paranoid: bool) -> (u
         }
     }
 
-    let reconstructed = stft::istft(&spectrogram, nperseg, noverlap, orig_len);
-    let copy_len = channel.len().min(reconstructed.len());
-    channel[..copy_len].copy_from_slice(&reconstructed[..copy_len]);
-
     (found, found)
 }
 
 /// Apply spectral smoothing to reduce sharp watermark features.
+/// Operates on an already-computed spectrogram (no STFT/ISTFT).
 ///
 /// Only smooths bins above 15kHz where watermarks live. Uses magnitude-only
 /// averaging (preserving original phase) to avoid the massive signal
 /// cancellation that complex-domain averaging causes.
-fn spectral_smoothing(channel: &mut [f32], sr: u32) {
-    let nperseg = 2048.min(channel.len() / 4).max(256);
-    let noverlap = nperseg * 3 / 4;
-    let (mut spectrogram, orig_len) = stft::stft(channel, nperseg, noverlap);
-
-    if spectrogram.is_empty() {
-        return;
-    }
-
-    let freq_resolution = sr as f64 / nperseg as f64;
-    let high_freq_start = (15000.0 / freq_resolution) as usize;
+fn apply_spectral_smoothing(spectrogram: &mut [Vec<Complex<f32>>], high_freq_start: usize) {
     let window = 5;
     let half = window / 2;
 
-    for frame in &mut spectrogram {
+    for frame in spectrogram.iter_mut() {
         let original: Vec<Complex<f32>> = frame.clone();
         let start = high_freq_start.max(half);
         for i in start..frame.len().saturating_sub(half) {
@@ -228,10 +234,6 @@ fn spectral_smoothing(channel: &mut [f32], sr: u32) {
             frame[i] = Complex::from_polar(avg_mag, phase);
         }
     }
-
-    let reconstructed = stft::istft(&spectrogram, nperseg, noverlap, orig_len);
-    let copy_len = channel.len().min(reconstructed.len());
-    channel[..copy_len].copy_from_slice(&reconstructed[..copy_len]);
 }
 
 /// Adaptive noise shaping - add shaped noise to mask watermarks.
@@ -252,28 +254,17 @@ fn adaptive_noise_shaping(channel: &mut [f32], sr: u32, paranoid: bool) {
     }
 }
 
-/// Attenuate spread-spectrum patterns in high frequencies.
-fn spread_spectrum_attenuation(channel: &mut [f32], sr: u32) {
-    let nperseg = 2048.min(channel.len() / 4).max(256);
-    let noverlap = nperseg * 3 / 4;
-    let (mut spectrogram, orig_len) = stft::stft(channel, nperseg, noverlap);
-
-    if spectrogram.is_empty() {
-        return;
-    }
-
-    let freq_resolution = sr as f64 / nperseg as f64;
-    let high_freq_start = (15000.0 / freq_resolution) as usize;
-
-    for frame in &mut spectrogram {
+/// Attenuate spread-spectrum patterns in high-frequency bins.
+/// Operates on an already-computed spectrogram (no STFT/ISTFT).
+fn apply_spread_spectrum_attenuation(
+    spectrogram: &mut [Vec<Complex<f32>>],
+    high_freq_start: usize,
+) {
+    for frame in spectrogram.iter_mut() {
         for val in frame.iter_mut().skip(high_freq_start) {
             *val *= 0.8;
         }
     }
-
-    let reconstructed = stft::istft(&spectrogram, nperseg, noverlap, orig_len);
-    let copy_len = channel.len().min(reconstructed.len());
-    channel[..copy_len].copy_from_slice(&reconstructed[..copy_len]);
 }
 
 /// An anomalous ultrasonic energy peak found by the scanner.
