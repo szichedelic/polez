@@ -35,8 +35,23 @@ const WATERMARK_FREQS: [f64; 4] = [18000.0, 19000.0, 20000.0, 21000.0];
 pub struct WatermarkDetector;
 
 impl WatermarkDetector {
+    /// All available detection method names.
+    pub const METHOD_NAMES: &'static [&'static str] = &[
+        "spread_spectrum",
+        "echo_signatures",
+        "statistical_anomalies",
+        "phase_modulation",
+        "amplitude_modulation",
+        "frequency_domain",
+    ];
+
     /// Run all detection methods on the audio buffer.
     pub fn detect_all(buffer: &AudioBuffer) -> WatermarkResult {
+        Self::detect_filtered(buffer, None)
+    }
+
+    /// Run detection methods, optionally filtered to only the specified names.
+    pub fn detect_filtered(buffer: &AudioBuffer, filter: Option<&[String]>) -> WatermarkResult {
         let mut result = WatermarkResult::default();
 
         if buffer.num_samples() < 4096 {
@@ -58,6 +73,11 @@ impl WatermarkDetector {
         ];
 
         for (name, method) in &methods {
+            if let Some(filter) = filter {
+                if !filter.iter().any(|f| f == name) {
+                    continue;
+                }
+            }
             let mr = method(&channel, sr);
             if mr.detected {
                 result.detected.push(WatermarkDetection {

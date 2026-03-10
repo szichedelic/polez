@@ -131,6 +131,7 @@ Examples:
   polez detect track.wav                        Quick watermark scan
   polez detect track.mp3 --deep                 Deep analysis with statistical tests
   polez detect track.wav --report analysis.json  Export detailed report to JSON
+  polez detect track.wav --filter spread_spectrum,echo_signatures
   polez --json detect track.wav                  Pipe results to jq or scripts")]
     Detect {
         /// Input audio file path
@@ -143,6 +144,12 @@ Examples:
         /// Export JSON analysis report to file
         #[arg(long)]
         report: Option<PathBuf>,
+
+        /// Run only specific detection methods (comma-separated)
+        /// Valid: spread_spectrum, echo_signatures, statistical_anomalies,
+        /// phase_modulation, amplitude_modulation, frequency_domain
+        #[arg(long, value_delimiter = ',')]
+        filter: Option<Vec<String>>,
     },
 
     /// Batch scan directory and output CSV results for dataset analysis

@@ -268,7 +268,15 @@ fn run_command(
             input_file,
             deep,
             report,
-        } => cmd_detect(&input_file, deep, report.as_deref(), json_mode, console),
+            filter,
+        } => cmd_detect(
+            &input_file,
+            deep,
+            report.as_deref(),
+            filter,
+            json_mode,
+            console,
+        ),
         Commands::Benchmark {
             directory,
             output,
@@ -749,11 +757,25 @@ fn cmd_detect(
     input_file: &Path,
     deep: bool,
     report: Option<&Path>,
+    filter: Option<Vec<String>>,
     json_mode: bool,
     console: &ConsoleManager,
 ) -> error::Result<()> {
     if !input_file.exists() {
         return Err(error::PolezError::FileNotFound(input_file.to_path_buf()));
+    }
+
+    // Validate filter method names
+    if let Some(ref methods) = filter {
+        for m in methods {
+            if !WatermarkDetector::METHOD_NAMES.contains(&m.as_str()) {
+                return Err(error::PolezError::Other(anyhow::anyhow!(
+                    "Unknown detection method: '{}'. Valid methods: {}",
+                    m,
+                    WatermarkDetector::METHOD_NAMES.join(", ")
+                )));
+            }
+        }
     }
 
     if !json_mode {
@@ -764,7 +786,7 @@ fn cmd_detect(
     let scan_result = MetadataScanner::scan(input_file)?;
     let (audio_buf, src_format) = audio::load_audio(input_file)?;
 
-    let watermark_result = WatermarkDetector::detect_all(&audio_buf);
+    let watermark_result = WatermarkDetector::detect_filtered(&audio_buf, filter.as_deref());
     let polez_result = detection::PolezDetector::detect(&audio_buf);
 
     let stat_result = if deep {
