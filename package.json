@@ -1,0 +1,13 @@
+{
+  "name": "polez",
+  "version": "2.1.0",
+  "private": true,
+  "scripts": {
+    "release": "release-it",
+    "release:dry": "release-it --dry-run"
+  },
+  "devDependencies": {
+    "@release-it/conventional-changelog": "^10.0.5",
+    "release-it": "^19.2.4"
+  }
+}
