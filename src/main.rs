@@ -316,6 +316,7 @@ fn run_command(
         } => cmd_bits(&input_file, bit, offset, count, search, json_mode, console),
         #[cfg(feature = "gui")]
         Commands::Gui { port, no_open } => cmd_gui(port, no_open, console),
+        Commands::Fingerprint { files } => cmd_fingerprint(&files, json_mode, console),
         Commands::Config { action } => cmd_config(action, console),
         Commands::Version => {
             BannerManager::new().show_version_info();
@@ -1231,6 +1232,112 @@ fn cmd_bits(
 
     let view = inspect::BitsView::new(bit, offset, count, search);
     view.render(&audio_buf)?;
+
+    Ok(())
+}
+
+fn cmd_fingerprint(
+    files: &[PathBuf],
+    json_mode: bool,
+    console: &ConsoleManager,
+) -> error::Result<()> {
+    use detection::perceptual_hash;
+
+    // Validate all files exist
+    for f in files {
+        if !f.exists() {
+            return Err(error::PolezError::FileNotFound(f.clone()));
+        }
+    }
+
+    // Compute hashes for all files
+    let mut hashes: Vec<(String, perceptual_hash::PerceptualHash)> = Vec::new();
+    for f in files {
+        if !json_mode {
+            console.info(&format!("Hashing: {}", f.display()));
+        }
+        let (buffer, _fmt) = audio::io::load_audio(f)?;
+        let hash = perceptual_hash::compute_hash(&buffer);
+        hashes.push((f.display().to_string(), hash));
+    }
+
+    // Compare all pairs
+    let mut comparisons: Vec<perceptual_hash::HashComparison> = Vec::new();
+    for i in 0..hashes.len() {
+        for j in (i + 1)..hashes.len() {
+            let similarity = perceptual_hash::compare_hashes(&hashes[i].1, &hashes[j].1);
+            comparisons.push(perceptual_hash::HashComparison {
+                file_a: hashes[i].0.clone(),
+                file_b: hashes[j].0.clone(),
+                similarity,
+                hash_length_a: hashes[i].1.hash.len(),
+                hash_length_b: hashes[j].1.hash.len(),
+            });
+        }
+    }
+
+    if json_mode {
+        #[derive(Serialize)]
+        struct FingerprintReport {
+            hashes: Vec<FileHash>,
+            comparisons: Vec<perceptual_hash::HashComparison>,
+        }
+        #[derive(Serialize)]
+        struct FileHash {
+            file: String,
+            hash: String,
+            hash_words: usize,
+            duration_secs: f64,
+        }
+        let report = FingerprintReport {
+            hashes: hashes
+                .iter()
+                .map(|(name, h)| FileHash {
+                    file: name.clone(),
+                    hash: perceptual_hash::hash_to_hex(&h.hash),
+                    hash_words: h.hash.len(),
+                    duration_secs: h.duration_secs,
+                })
+                .collect(),
+            comparisons,
+        };
+        print_json(&report)?;
+    } else {
+        console.info("Perceptual Hashes");
+        for (name, hash) in &hashes {
+            let hex = perceptual_hash::hash_to_hex(&hash.hash);
+            let display_hex = if hex.len() > 32 {
+                format!("{}...", &hex[..32])
+            } else {
+                hex
+            };
+            console.info(&format!(
+                "  {} — {} ({:.1}s)",
+                name, display_hex, hash.duration_secs
+            ));
+        }
+
+        println!();
+        console.info("Comparisons");
+        for comp in &comparisons {
+            let label = if comp.similarity > 0.9 {
+                "MATCH"
+            } else if comp.similarity > 0.7 {
+                "SIMILAR"
+            } else if comp.similarity > 0.5 {
+                "WEAK"
+            } else {
+                "DIFFERENT"
+            };
+            console.info(&format!(
+                "  {} vs {} — {:.1}% similarity [{}]",
+                comp.file_a,
+                comp.file_b,
+                comp.similarity * 100.0,
+                label
+            ));
+        }
+    }
 
     Ok(())
 }

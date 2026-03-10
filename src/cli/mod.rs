@@ -251,6 +251,18 @@ Examples:
         search: bool,
     },
 
+    /// Compare audio files using perceptual hashing
+    #[command(after_help = "\
+Examples:
+  polez fingerprint file1.wav file2.wav             Compare two audio files
+  polez fingerprint file1.wav file2.mp3 file3.flac  Compare multiple files
+  polez --json fingerprint file1.wav file2.wav      Machine-readable JSON output")]
+    Fingerprint {
+        /// Audio files to compare (2 or more)
+        #[arg(required = true, num_args = 2..)]
+        files: Vec<PathBuf>,
+    },
+
     /// Launch web-based forensics GUI
     #[cfg(feature = "gui")]
     Gui {

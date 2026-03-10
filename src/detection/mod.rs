@@ -1,4 +1,5 @@
 pub mod metadata_scan;
+pub mod perceptual_hash;
 pub mod polez;
 pub mod statistical;
 pub mod watermark;
