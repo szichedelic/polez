@@ -133,16 +133,18 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
   if (!fileLoaded || !hasCleaned) return null;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
+    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="A/B audio comparison">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="text-zinc-400 text-sm font-medium">A/B COMPARISON</span>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="flex gap-1">
+          <div className="flex gap-1" role="group" aria-label="Audio source selection">
             {(['both', 'original', 'cleaned'] as const).map((src) => (
               <button
                 key={src}
                 onClick={() => handleSourceToggle(src)}
+                aria-pressed={activeSource === src}
+                aria-label={`Play ${src} audio`}
                 className={`px-2 py-1.5 sm:py-0.5 rounded text-xs capitalize min-h-[44px] sm:min-h-0 ${
                   activeSource === src
                     ? src === 'cleaned'
@@ -160,16 +162,20 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
 
           <div className="hidden sm:block w-px h-4 bg-zinc-700" />
 
-          <div className="flex gap-1">
+          <div className="flex gap-1" role="group" aria-label="View mode">
             <button
               onClick={() => setViewMode('side-by-side')}
               className={`px-2 py-1.5 sm:py-0.5 rounded text-xs min-h-[44px] sm:min-h-0 ${viewMode === 'side-by-side' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+              aria-pressed={viewMode === 'side-by-side'}
+              aria-label="Split view"
             >
               Split
             </button>
             <button
               onClick={() => setViewMode('overlay')}
               className={`px-2 py-1.5 sm:py-0.5 rounded text-xs min-h-[44px] sm:min-h-0 ${viewMode === 'overlay' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+              aria-pressed={viewMode === 'overlay'}
+              aria-label="Overlay view"
             >
               Overlay
             </button>
@@ -181,12 +187,14 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
             <button
               onClick={togglePlayPause}
               className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
+              aria-label={playing ? 'Pause comparison playback' : 'Play comparison'}
             >
               {playing ? 'Pause' : 'Play'}
             </button>
             <button
               onClick={stop}
               className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
+              aria-label="Stop comparison playback"
             >
               Stop
             </button>
@@ -239,6 +247,6 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
           />
         </div>
       )}
-    </div>
+    </section>
   );
 }

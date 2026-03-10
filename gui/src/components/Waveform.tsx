@@ -38,25 +38,27 @@ export function Waveform({ fileLoaded }: Props) {
   }, [fileLoaded]);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
+    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Waveform display">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <span className="text-zinc-400 text-sm font-medium">WAVEFORM</span>
         <div className="flex gap-2">
           <button
             onClick={() => wsRef.current?.playPause()}
             className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
+            aria-label="Play or pause waveform"
           >
             Play/Pause
           </button>
           <button
             onClick={() => wsRef.current?.stop()}
             className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
+            aria-label="Stop waveform playback"
           >
             Stop
           </button>
         </div>
       </div>
-      <div ref={containerRef} />
-    </div>
+      <div ref={containerRef} aria-label="Audio waveform visualization" role="img" />
+    </section>
   );
 }

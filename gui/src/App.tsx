@@ -67,6 +67,7 @@ function App() {
         type="file"
         accept="audio/*"
         className="hidden"
+        aria-label="Upload audio file"
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) {
@@ -78,16 +79,20 @@ function App() {
       {showShortcuts && (
         <div
           className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Keyboard shortcuts"
           onClick={() => setShowShortcuts(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowShortcuts(false); }}
         >
           <div
             className="bg-zinc-800 border border-zinc-600 rounded-lg p-6 max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-zinc-100 font-bold text-lg mb-4">Keyboard Shortcuts</h2>
-            <div className="space-y-2">
+            <div className="space-y-2" role="list">
               {SHORTCUT_LIST.map((s) => (
-                <div key={s.keys} className="flex justify-between gap-6">
+                <div key={s.keys} className="flex justify-between gap-6" role="listitem">
                   <kbd className="text-purple-400 font-mono text-sm bg-zinc-700 px-2 py-0.5 rounded">
                     {s.keys}
                   </kbd>
@@ -98,6 +103,7 @@ function App() {
             <button
               onClick={() => setShowShortcuts(false)}
               className="mt-4 w-full text-center text-zinc-500 text-sm hover:text-zinc-300"
+              aria-label="Close keyboard shortcuts dialog"
             >
               Press ? or click to close
             </button>
@@ -105,11 +111,13 @@ function App() {
         </div>
       )}
 
-      <ErrorBoundary section="Upload">
-        <FileHeader fileInfo={fileInfo} onFileLoaded={handleFileLoaded} />
-      </ErrorBoundary>
+      <header>
+        <ErrorBoundary section="Upload">
+          <FileHeader fileInfo={fileInfo} onFileLoaded={handleFileLoaded} />
+        </ErrorBoundary>
+      </header>
 
-      <div className="p-4 space-y-4">
+      <main className="p-4 space-y-4">
         <ErrorBoundary section="Audio Player">
           <AudioPlayer fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
         </ErrorBoundary>
@@ -148,7 +156,7 @@ function App() {
         <ErrorBoundary section="Batch Processing">
           <BatchPanel />
         </ErrorBoundary>
-      </div>
+      </main>
     </div>
   );
 }

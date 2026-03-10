@@ -16,10 +16,10 @@ export function BitPlaneViewer({ fileLoaded }: Props) {
   }, [fileLoaded]);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
+    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Bit plane analysis">
       <div className="flex items-center justify-between mb-3">
         <span className="text-zinc-400 text-sm font-medium">BIT PLANES</span>
-        {loading && <span className="text-purple-400 text-xs">Loading...</span>}
+        {loading && <span className="text-purple-400 text-xs" aria-live="polite">Loading...</span>}
       </div>
 
       {!data && !loading && (
@@ -37,7 +37,7 @@ export function BitPlaneViewer({ fileLoaded }: Props) {
                 <span className="text-zinc-500 text-xs w-20">
                   Plane {plane.bit} {plane.bit === 0 ? '(LSB)' : plane.bit === 7 ? '(MSB)' : ''}
                 </span>
-                <div className="flex-1 h-3 bg-zinc-700 rounded-full overflow-hidden">
+                <div className="flex-1 h-3 bg-zinc-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={barWidth} aria-valuemin={0} aria-valuemax={100} aria-label={`Plane ${plane.bit} ones ratio: ${(plane.ones_ratio * 100).toFixed(2)}%`}>
                   <div
                     className={`h-full rounded-full ${biased ? 'bg-red-500' : 'bg-green-500'}`}
                     style={{ width: `${barWidth}%` }}
@@ -54,6 +54,6 @@ export function BitPlaneViewer({ fileLoaded }: Props) {
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

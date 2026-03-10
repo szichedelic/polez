@@ -70,7 +70,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
 
   if (fileInfo && !loading) {
     return (
-      <div className="flex flex-wrap items-center gap-2 sm:gap-4 bg-zinc-900 border-b border-zinc-700 px-4 py-3">
+      <nav className="flex flex-wrap items-center gap-2 sm:gap-4 bg-zinc-900 border-b border-zinc-700 px-4 py-3" aria-label="File information">
         <span className="text-purple-400 font-bold text-lg tracking-wider">POLEZ</span>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-zinc-400 text-sm flex-1 min-w-0">
           <span className="text-zinc-200 font-medium truncate">{fileInfo.file_path.split('/').pop()}</span>
@@ -82,6 +82,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
         <button
           onClick={() => inputRef.current?.click()}
           className="text-zinc-400 hover:text-zinc-200 text-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
+          aria-label="Change audio file"
         >
           Change file
         </button>
@@ -91,8 +92,9 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
           accept="audio/*"
           onChange={handlePickerChange}
           className="hidden"
+          aria-label="Choose audio file"
         />
-      </div>
+      </nav>
     );
   }
 
@@ -101,6 +103,8 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
+      role="region"
+      aria-label="File upload area"
       className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-lg mx-4 my-4 py-12 transition-colors ${
         dragOver
           ? 'border-purple-400 bg-purple-500/10'
@@ -114,7 +118,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
           <div className="text-zinc-400 text-sm text-center">
             Uploading... {progress}%
           </div>
-          <div className="w-full bg-zinc-700 rounded-full h-2">
+          <div className="w-full bg-zinc-700 rounded-full h-2" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
             <div
               className="bg-purple-500 h-2 rounded-full transition-all duration-200"
               style={{ width: `${progress}%` }}
@@ -130,6 +134,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
           <button
             onClick={() => inputRef.current?.click()}
             className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 sm:py-1.5 rounded text-sm font-medium min-h-[44px]"
+            aria-label="Choose audio file to upload"
           >
             Choose File
           </button>
@@ -142,10 +147,11 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
             accept="audio/*"
             onChange={handlePickerChange}
             className="hidden"
+            aria-label="Choose audio file"
           />
         </>
       )}
-      {error && <span className="text-red-400 text-sm">{error}</span>}
+      {error && <span className="text-red-400 text-sm" role="alert">{error}</span>}
     </div>
   );
 }

@@ -91,7 +91,7 @@ export function BatchPanel() {
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
+    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Batch processing">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="text-zinc-400 text-sm font-medium">BATCH PROCESSING</span>
         <div className="flex flex-wrap gap-2 items-center">
@@ -100,6 +100,7 @@ export function BatchPanel() {
             onChange={(e) => setMode(e.target.value)}
             disabled={processing}
             className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-2 sm:py-1 text-xs min-h-[44px] sm:min-h-0"
+            aria-label="Select batch cleaning mode"
           >
             <option value="fast">Fast</option>
             <option value="standard">Standard</option>
@@ -110,6 +111,7 @@ export function BatchPanel() {
             onClick={handleProcess}
             disabled={processing || files.length === 0}
             className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
+            aria-label={`Clean ${files.length} file${files.length !== 1 ? 's' : ''}`}
           >
             {processing ? 'Processing...' : `Clean ${files.length} file${files.length !== 1 ? 's' : ''}`}
           </button>
@@ -124,7 +126,7 @@ export function BatchPanel() {
         </div>
       </div>
 
-      {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
+      {error && <p className="text-red-400 text-sm mb-2" role="alert">{error}</p>}
 
       <div
         onDrop={handleDrop}
@@ -151,6 +153,7 @@ export function BatchPanel() {
           multiple
           onChange={(e) => { if (e.target.files) addFiles(e.target.files); }}
           className="hidden"
+          aria-label="Choose audio files for batch processing"
         />
       </div>
 
@@ -195,6 +198,6 @@ export function BatchPanel() {
       {files.length === 0 && (
         <p className="text-zinc-500 text-sm text-center">No files queued</p>
       )}
-    </div>
+    </section>
   );
 }

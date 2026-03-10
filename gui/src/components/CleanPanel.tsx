@@ -188,7 +188,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
+    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Sanitization controls">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="text-zinc-400 text-sm font-medium">CLEAN</span>
         <div className="flex flex-wrap gap-2 items-center">
@@ -199,6 +199,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
               disabled={loading}
               className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-2 sm:py-1 text-xs min-h-[44px] sm:min-h-0"
               title={preset ? presets.find(p => p.name === preset)?.description : 'No preset (use defaults)'}
+              aria-label="Select preset configuration"
             >
               <option value="">No Preset</option>
               {presets.map(p => (
@@ -211,6 +212,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
             onChange={(e) => setMode(e.target.value)}
             disabled={loading}
             className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-2 sm:py-1 text-xs min-h-[44px] sm:min-h-0"
+            aria-label="Select cleaning mode"
           >
             <option value="fast">Fast</option>
             <option value="standard">Standard</option>
@@ -222,6 +224,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
             onClick={handleClean}
             disabled={!fileLoaded || loading}
             className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
+            aria-label="Start audio sanitization"
           >
             {loading ? 'Cleaning...' : 'Clean'}
           </button>
@@ -231,6 +234,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
               onClick={handleSave}
               disabled={saving}
               className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
+              aria-label="Save cleaned audio file"
             >
               {saving ? 'Saving...' : 'Save File'}
             </button>
@@ -239,7 +243,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
       </div>
 
       {error && (
-        <p className="text-red-400 text-sm mb-2">{error}</p>
+        <p className="text-red-400 text-sm mb-2" role="alert">{error}</p>
       )}
 
       {preset && presets.length > 0 && (
@@ -254,6 +258,8 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
       <button
         onClick={() => setShowAdvanced(!showAdvanced)}
         className="text-xs text-zinc-500 hover:text-zinc-300 mb-2 flex items-center gap-1"
+        aria-expanded={showAdvanced}
+        aria-label="Toggle advanced sanitization options"
       >
         <span>{showAdvanced ? '\u25BC' : '\u25B6'}</span>
         Advanced Options ({Object.values(advancedFlags).filter(Boolean).length + Object.values(fpFlags).filter(Boolean).length} active)
@@ -297,7 +303,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
       )}
 
       {loading && (
-        <p className="text-zinc-400 text-sm">Running sanitization pipeline...</p>
+        <p className="text-zinc-400 text-sm" aria-live="polite">Running sanitization pipeline...</p>
       )}
 
       {result && (
@@ -319,6 +325,6 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
           </div>
         </>
       )}
-    </div>
+    </section>
   );
 }

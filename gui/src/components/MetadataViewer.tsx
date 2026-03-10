@@ -53,7 +53,7 @@ export function MetadataViewer({ fileLoaded, hasCleaned }: Props) {
   if (!fileLoaded) return null;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
+    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Metadata tags viewer">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="text-zinc-400 text-sm font-medium">METADATA TAGS</span>
         <div className="flex flex-wrap items-center gap-2">
@@ -72,6 +72,7 @@ export function MetadataViewer({ fileLoaded, hasCleaned }: Props) {
             onClick={scan}
             disabled={loading}
             className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-3 py-2 sm:py-1 rounded text-xs min-h-[44px] sm:min-h-0"
+            aria-label="Scan file for metadata tags"
           >
             {loading ? 'Scanning...' : 'Scan Tags'}
           </button>
@@ -161,6 +162,6 @@ export function MetadataViewer({ fileLoaded, hasCleaned }: Props) {
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

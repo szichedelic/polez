@@ -15,7 +15,7 @@ function ConfidenceBar({ label, value, max = 1 }: { label: string; value: number
         <span className="text-zinc-300">{label}</span>
         <span className="text-zinc-400">{(pct).toFixed(1)}%</span>
       </div>
-      <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
+      <div className="h-2 bg-zinc-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${label}: ${pct.toFixed(1)}%`}>
         <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -48,7 +48,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
+    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Detection analysis">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="text-zinc-400 text-sm font-medium">DETECTION</span>
         <div className="flex gap-2">
@@ -57,6 +57,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
             onClick={() => runAnalysis('all')}
             disabled={!fileLoaded || !!loading}
             className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
+            aria-label="Run all detection analyses"
           >
             {loading === 'all' ? 'Running...' : 'Run All'}
           </button>
@@ -64,6 +65,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
             onChange={(e) => { if (e.target.value) runAnalysis(e.target.value); e.target.value = ''; }}
             disabled={!fileLoaded || !!loading}
             className="bg-zinc-800 text-zinc-200 border border-zinc-600 rounded px-2 py-2 sm:py-1 text-xs min-h-[44px] sm:min-h-0"
+            aria-label="Select specific analysis type"
           >
             <option value="">Pick Analysis...</option>
             <option value="watermark">Watermark</option>
@@ -74,6 +76,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
         </div>
       </div>
 
+      <div aria-live="polite">
       {!results && (
         <p className="text-zinc-500 text-sm">Load a file and run analysis</p>
       )}
@@ -115,6 +118,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
           </div>
         </details>
       )}
-    </div>
+      </div>
+    </section>
   );
 }

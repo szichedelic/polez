@@ -167,7 +167,7 @@ export function Spectrogram({ fileLoaded }: Props) {
   const isZoomed = view.freqMin !== 0 || view.freqMax !== 24000 || view.timeStart !== 0 || view.duration !== 0;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded p-4">
+    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Spectrogram display">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <span className="text-zinc-400 text-sm font-medium">SPECTROGRAM</span>
         <div className="flex items-center gap-2">
@@ -175,11 +175,12 @@ export function Spectrogram({ fileLoaded }: Props) {
             <button
               onClick={resetZoom}
               className="text-zinc-500 hover:text-zinc-300 text-xs min-h-[44px] sm:min-h-0"
+              aria-label="Reset spectrogram zoom"
             >
               Reset zoom
             </button>
           )}
-          {loading && <span className="text-purple-400 text-xs">Loading...</span>}
+          {loading && <span className="text-purple-400 text-xs" aria-live="polite">Loading...</span>}
           <span className="text-zinc-600 text-xs hidden sm:inline">Scroll to zoom, drag to pan</span>
         </div>
       </div>
@@ -197,6 +198,8 @@ export function Spectrogram({ fileLoaded }: Props) {
           ref={canvasRef}
           className="w-full h-48 rounded"
           style={{ imageRendering: 'pixelated' }}
+          aria-label="Spectrogram frequency visualization"
+          role="img"
         />
       </div>
       {data && (
@@ -206,6 +209,6 @@ export function Spectrogram({ fileLoaded }: Props) {
           <span>{data.time_end.toFixed(1)}s</span>
         </div>
       )}
-    </div>
+    </section>
   );
 }
