@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::path::Path;
 
 use crate::audio::AudioBuffer;
@@ -45,20 +46,86 @@ impl std::fmt::Display for AudioFormat {
 }
 
 /// Detect audio format from file extension.
-pub fn detect_format(path: &Path) -> Result<AudioFormat> {
+fn detect_format_by_extension(path: &Path) -> Option<AudioFormat> {
     match path
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase())
         .as_deref()
     {
-        Some("wav") => Ok(AudioFormat::Wav),
-        Some("mp3") => Ok(AudioFormat::Mp3),
-        Some("flac") => Ok(AudioFormat::Flac),
-        Some("ogg") | Some("oga") => Ok(AudioFormat::Ogg),
-        Some("aac") | Some("m4a") => Ok(AudioFormat::Aac),
-        Some(ext) => Err(PolezError::UnsupportedFormat(ext.to_string())),
-        None => Err(PolezError::UnsupportedFormat("no extension".to_string())),
+        Some("wav") => Some(AudioFormat::Wav),
+        Some("mp3") => Some(AudioFormat::Mp3),
+        Some("flac") => Some(AudioFormat::Flac),
+        Some("ogg") | Some("oga") => Some(AudioFormat::Ogg),
+        Some("aac") | Some("m4a") => Some(AudioFormat::Aac),
+        _ => None,
+    }
+}
+
+/// Detect audio format by reading file magic bytes.
+fn detect_format_by_magic(path: &Path) -> Option<AudioFormat> {
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut header = [0u8; 12];
+    let bytes_read = file.read(&mut header).ok()?;
+    if bytes_read < 4 {
+        return None;
+    }
+
+    // WAV: starts with "RIFF" ... "WAVE"
+    if bytes_read >= 12 && &header[0..4] == b"RIFF" && &header[8..12] == b"WAVE" {
+        return Some(AudioFormat::Wav);
+    }
+
+    // FLAC: starts with "fLaC"
+    if &header[0..4] == b"fLaC" {
+        return Some(AudioFormat::Flac);
+    }
+
+    // OGG: starts with "OggS"
+    if &header[0..4] == b"OggS" {
+        return Some(AudioFormat::Ogg);
+    }
+
+    // MP3: ID3 tag or MPEG sync word
+    if &header[0..3] == b"ID3" {
+        return Some(AudioFormat::Mp3);
+    }
+    if header[0] == 0xFF && (header[1] & 0xE0) == 0xE0 {
+        return Some(AudioFormat::Mp3);
+    }
+
+    // M4A/AAC: "ftyp" at offset 4
+    if bytes_read >= 8 && &header[4..8] == b"ftyp" {
+        return Some(AudioFormat::Aac);
+    }
+
+    None
+}
+
+/// Detect audio format using magic bytes first, falling back to file extension.
+/// Warns if the extension doesn't match the detected format.
+pub fn detect_format(path: &Path) -> Result<AudioFormat> {
+    let ext_format = detect_format_by_extension(path);
+    let magic_format = detect_format_by_magic(path);
+
+    match (magic_format, ext_format) {
+        (Some(magic), Some(ext)) if magic != ext => {
+            tracing::warn!(
+                "File extension suggests {} but content is actually {}; using detected format",
+                ext,
+                magic
+            );
+            Ok(magic)
+        }
+        (Some(magic), _) => Ok(magic),
+        (None, Some(ext)) => Ok(ext),
+        (None, None) => {
+            let ext_str = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("no extension");
+            Err(PolezError::UnsupportedFormat(ext_str.to_string()))
+        }
     }
 }
 
