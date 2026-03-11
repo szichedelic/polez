@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @source "../safelist.txt";
 
+@theme {
+  --font-heading: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-data: 'JetBrains Mono', ui-monospace, monospace;
+}
+
 @layer base {
   :root {
     /* Zinc neutral palette (UI chrome) */
@@ -28,6 +34,6 @@
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   overflow-x: hidden;
 }
