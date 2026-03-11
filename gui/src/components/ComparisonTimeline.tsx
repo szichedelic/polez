@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { getAudioUrl, getCleanedAudioUrl } from '../api/client';
+import { Card } from './Card';
 
 interface Props {
   fileLoaded: boolean;
@@ -133,7 +134,7 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
   if (!fileLoaded || !hasCleaned) return null;
 
   return (
-    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="A/B audio comparison">
+    <Card label="A/B audio comparison">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">A/B COMPARISON</span>
 
@@ -160,7 +161,7 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
             ))}
           </div>
 
-          <div className="hidden sm:block w-px h-4 bg-zinc-700" />
+          <div className="hidden sm:block w-px h-4 bg-zinc-800" />
 
           <div className="flex gap-1" role="group" aria-label="View mode">
             <button
@@ -181,7 +182,7 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
             </button>
           </div>
 
-          <div className="hidden sm:block w-px h-4 bg-zinc-700" />
+          <div className="hidden sm:block w-px h-4 bg-zinc-800" />
 
           <div className="flex gap-2">
             <button
@@ -247,6 +248,6 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
           />
         </div>
       )}
-    </section>
+    </Card>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { getAudioUrl } from '../api/client';
+import { Card } from './Card';
 
 interface Props {
   fileLoaded: boolean;
@@ -38,7 +39,7 @@ export function Waveform({ fileLoaded }: Props) {
   }, [fileLoaded]);
 
   return (
-    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Waveform display">
+    <Card label="Waveform display">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">WAVEFORM</span>
         <div className="flex gap-2">
@@ -59,6 +60,6 @@ export function Waveform({ fileLoaded }: Props) {
         </div>
       </div>
       <div ref={containerRef} aria-label="Audio waveform visualization" role="img" />
-    </section>
+    </Card>
   );
 }

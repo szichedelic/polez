@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { analyzeMetadata } from '../api/client';
+import { Card } from './Card';
 
 interface TagInfo {
   tag_type: string;
@@ -53,7 +54,7 @@ export function MetadataViewer({ fileLoaded, hasCleaned }: Props) {
   if (!fileLoaded) return null;
 
   return (
-    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Metadata tags viewer">
+    <Card label="Metadata tags viewer">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">METADATA TAGS</span>
         <div className="flex flex-wrap items-center gap-2">
@@ -162,6 +163,6 @@ export function MetadataViewer({ fileLoaded, hasCleaned }: Props) {
           </div>
         </div>
       )}
-    </section>
+    </Card>
   );
 }

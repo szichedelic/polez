@@ -107,8 +107,8 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
       aria-label="File upload area"
       className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-lg mx-4 my-4 py-12 transition-colors ${
         dragOver
-          ? 'border-zinc-500 bg-zinc-800/50'
-          : 'border-zinc-600 bg-zinc-900 hover:border-zinc-500'
+          ? 'border-zinc-600 bg-zinc-900/50'
+          : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
       }`}
     >
       <div className="font-heading text-zinc-200 font-semibold text-2xl tracking-tight mb-2">POLEZ</div>

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { batchClean, getBatchDownloadUrl, MAX_UPLOAD_BYTES } from '../api/client';
 import type { BatchFileResult } from '../api/client';
+import { Card } from './Card';
 
 interface BatchFile {
   file: File;
@@ -91,7 +92,7 @@ export function BatchPanel() {
   };
 
   return (
-    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Batch processing">
+    <Card label="Batch processing">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">BATCH PROCESSING</span>
         <div className="flex flex-wrap gap-2 items-center">
@@ -133,7 +134,7 @@ export function BatchPanel() {
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         className={`border border-dashed rounded p-4 mb-3 text-center transition-colors ${
-          dragOver ? 'border-zinc-500 bg-zinc-800/50' : 'border-zinc-700 hover:border-zinc-600'
+          dragOver ? 'border-zinc-600 bg-zinc-900/50' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
         }`}
       >
         <div className="text-zinc-400 text-sm mb-1">
@@ -199,6 +200,6 @@ export function BatchPanel() {
       {files.length === 0 && (
         <p className="text-zinc-500 text-sm text-center">No files queued</p>
       )}
-    </section>
+    </Card>
   );
 }

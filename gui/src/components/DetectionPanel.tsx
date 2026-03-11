@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { analyzeAll, analyzeWatermark, analyzePolez, analyzeStatistical, analyzeMetadata } from '../api/client';
 import { useColorblind } from '../hooks/useColorblind';
+import { Card } from './Card';
 
 interface Props {
   fileLoaded: boolean;
@@ -51,7 +52,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
   };
 
   return (
-    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Detection analysis">
+    <Card label="Detection analysis" variant={results ? 'active' : 'default'}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">DETECTION</span>
         <div className="flex gap-2">
@@ -122,6 +123,6 @@ export function DetectionPanel({ fileLoaded }: Props) {
         </details>
       )}
       </div>
-    </section>
+    </Card>
   );
 }

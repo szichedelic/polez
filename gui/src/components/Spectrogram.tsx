@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getSpectrogram, type SpectrogramData } from '../api/client';
+import { Card } from './Card';
 
 interface Props {
   fileLoaded: boolean;
@@ -191,7 +192,7 @@ export function Spectrogram({ fileLoaded }: Props) {
   const isZoomed = view.freqMin !== 0 || view.freqMax !== 24000 || view.timeStart !== 0 || view.duration !== 0;
 
   return (
-    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Spectrogram display">
+    <Card label="Spectrogram display">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">SPECTROGRAM</span>
         <div className="flex items-center gap-2">
@@ -232,6 +233,6 @@ export function Spectrogram({ fileLoaded }: Props) {
           <span>{data.time_end.toFixed(1)}s</span>
         </div>
       )}
-    </section>
+    </Card>
   );
 }

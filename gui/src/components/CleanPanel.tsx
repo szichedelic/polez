@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { cleanFile, saveCleanedFile, getPresets, DEFAULT_ADVANCED_FLAGS, DEFAULT_FINGERPRINT_FLAGS } from '../api/client';
 import type { CleanResponse, VerificationResult as VerResult, PresetInfo, AdvancedFlags, FingerprintFlags } from '../api/client';
 import { useColorblind } from '../hooks/useColorblind';
+import { Card } from './Card';
 
 interface Props {
   fileLoaded: boolean;
@@ -184,7 +185,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
   };
 
   return (
-    <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Sanitization controls">
+    <Card label="Sanitization controls" variant={result ? 'active' : 'default'}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">CLEAN</span>
         <div className="flex flex-wrap gap-2 items-center">
@@ -315,12 +316,12 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
 
           <div className="flex flex-col sm:flex-row gap-4">
             <DetectionColumn title="Before" data={result.before} />
-            <div className="hidden sm:block w-px bg-zinc-700" />
-            <div className="sm:hidden h-px bg-zinc-700" />
+            <div className="hidden sm:block w-px bg-zinc-800" />
+            <div className="sm:hidden h-px bg-zinc-800" />
             <DetectionColumn title="After" data={result.after} />
           </div>
         </>
       )}
-    </section>
+    </Card>
   );
 }

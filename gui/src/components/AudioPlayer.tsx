@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getAudioUrl, getCleanedAudioUrl } from '../api/client';
+import { Card } from './Card';
 
 interface Props {
   fileLoaded: boolean;
@@ -98,7 +99,7 @@ export function AudioPlayer({ fileLoaded, hasCleaned }: Props) {
   if (!fileLoaded) return null;
 
   return (
-    <section className="bg-zinc-900 border border-zinc-700 rounded p-3" aria-label="Audio player">
+    <Card label="Audio player" padding="sm">
       <audio
         ref={audioRef}
         src={audioUrl}
@@ -196,6 +197,6 @@ export function AudioPlayer({ fileLoaded, hasCleaned }: Props) {
           </div>
         )}
       </div>
-    </section>
+    </Card>
   );
 }
