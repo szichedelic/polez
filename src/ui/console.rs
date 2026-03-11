@@ -153,7 +153,7 @@ impl ConsoleManager {
             }
         }
 
-        // AI probability
+        // AI probability (experimental — not validated)
         if let Some(ai_prob) = analysis.ai_probability {
             self.out(format_args!(""));
             let prob_str = format!("{:.0}%", ai_prob * 100.0);
@@ -165,7 +165,8 @@ impl ConsoleManager {
                 prob_str.green().bold().to_string()
             };
             self.out(format_args!(
-                "  AI Probability:     {colored_prob} ({ai_prob:.2})"
+                "  AI Probability:     {colored_prob} ({ai_prob:.2}) {}",
+                "[experimental — not validated]".yellow()
             ));
         }
 

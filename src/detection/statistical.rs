@@ -11,9 +11,14 @@ use crate::audio::AudioBuffer;
 use crate::sanitization::dsp::{stats, stft};
 
 /// Statistical analysis result.
+///
+/// The `ai_probability` score has NOT been validated against real AI-generated
+/// audio and should be treated as an experimental heuristic, not a calibrated
+/// probability.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct StatisticalResult {
     /// Estimated probability that the audio is AI-generated (0.0 to 1.0).
+    /// NOT calibrated — treat as experimental heuristic.
     pub ai_probability: f64,
     /// Complement of `ai_probability` (1.0 - ai_probability).
     pub human_confidence: f64,
@@ -27,9 +32,14 @@ pub struct StatisticalResult {
     pub spectral: SpectralAnalysis,
     /// AI-specific generation indicators.
     pub ai_indicators: AiIndicators,
+    /// Whether the AI scoring model has been validated against real data.
+    pub validated: bool,
 }
 
-/// Specific AI generation indicators.
+/// EXPERIMENTAL AI generation indicators — not validated against real data.
+///
+/// These heuristics may trigger on electronic music, synthesizers, and drum
+/// machines.  Results should be treated as speculative.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct AiIndicators {
     /// How smooth the spectrogram is frame-to-frame (higher = more AI-like).
