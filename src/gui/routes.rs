@@ -1342,18 +1342,35 @@ async fn batch_clean(
                     s.temp_paths.push(output_path.clone());
                     s.temp_paths.push(input_path);
                 }
-                if let Ok(mut map) = BATCH_DOWNLOADS.lock() {
-                    purge_stale_downloads(&mut map);
-                    map.insert(id.clone(), (output_path, std::time::Instant::now()));
+                match BATCH_DOWNLOADS.lock() {
+                    Ok(mut map) => {
+                        purge_stale_downloads(&mut map);
+                        map.insert(id.clone(), (output_path, std::time::Instant::now()));
+                        results.push(BatchFileResult {
+                            filename,
+                            success: true,
+                            error: None,
+                            quality_loss: Some(san_result.quality_loss),
+                            processing_time: Some(elapsed.as_secs_f64()),
+                            download_id: Some(id),
+                        });
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            file = %filename,
+                            error = %e,
+                            "BATCH_DOWNLOADS lock poisoned, download will be unavailable"
+                        );
+                        results.push(BatchFileResult {
+                            filename,
+                            success: true,
+                            error: Some("Download unavailable (internal lock error)".to_string()),
+                            quality_loss: Some(san_result.quality_loss),
+                            processing_time: Some(elapsed.as_secs_f64()),
+                            download_id: None,
+                        });
+                    }
                 }
-                results.push(BatchFileResult {
-                    filename,
-                    success: true,
-                    error: None,
-                    quality_loss: Some(san_result.quality_loss),
-                    processing_time: Some(elapsed.as_secs_f64()),
-                    download_id: Some(id),
-                });
             }
             (Err(e), _) => {
                 results.push(BatchFileResult {
