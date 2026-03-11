@@ -116,7 +116,7 @@ function App() {
             <div className="space-y-2" role="list">
               {SHORTCUT_LIST.map((s) => (
                 <div key={s.keys} className="flex justify-between gap-6" role="listitem">
-                  <kbd className="text-zinc-300 font-mono text-sm bg-zinc-700 px-2 py-0.5 rounded">
+                  <kbd className="text-zinc-300 font-data text-sm bg-zinc-700 px-2 py-0.5 rounded">
                     {s.keys}
                   </kbd>
                   <span className="text-zinc-400 text-sm">{s.description}</span>

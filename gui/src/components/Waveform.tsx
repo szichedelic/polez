@@ -40,7 +40,7 @@ export function Waveform({ fileLoaded }: Props) {
   return (
     <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Waveform display">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <span className="text-zinc-400 text-sm font-medium">WAVEFORM</span>
+        <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">WAVEFORM</span>
         <div className="flex gap-2">
           <button
             onClick={() => wsRef.current?.playPause()}

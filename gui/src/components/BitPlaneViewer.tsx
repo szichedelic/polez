@@ -20,7 +20,7 @@ export function BitPlaneViewer({ fileLoaded }: Props) {
   return (
     <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Bit plane analysis">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-zinc-400 text-sm font-medium">BIT PLANES</span>
+        <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">BIT PLANES</span>
         {loading && <span className="text-zinc-400 text-xs" aria-live="polite">Loading...</span>}
       </div>
 
@@ -45,7 +45,7 @@ export function BitPlaneViewer({ fileLoaded }: Props) {
                     style={{ width: `${barWidth}%` }}
                   />
                 </div>
-                <span className={`text-xs w-20 text-right ${biased ? palette.biased.text : palette.normal.text}`}>
+                <span className={`text-xs w-20 text-right font-data ${biased ? palette.biased.text : palette.normal.text}`}>
                   {biased ? '\u26A0 ' : ''}{(plane.ones_ratio * 100).toFixed(2)}%
                 </span>
               </div>

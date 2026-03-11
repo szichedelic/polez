@@ -15,7 +15,7 @@ function ConfidenceBar({ label, value, max = 1 }: { label: string; value: number
     <div className="mb-2">
       <div className="flex justify-between text-sm mb-1">
         <span className="text-zinc-300">{indicator ? `${indicator} ${label}` : label}</span>
-        <span className="text-zinc-400">{(pct).toFixed(1)}%</span>
+        <span className="text-zinc-400 font-data">{(pct).toFixed(1)}%</span>
       </div>
       <div className="h-2 bg-zinc-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${label}: ${pct.toFixed(1)}%`}>
         <div className={`h-full ${bg} rounded-full`} style={{ width: `${pct}%` }} />
@@ -53,7 +53,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
   return (
     <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Detection analysis">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <span className="text-zinc-400 text-sm font-medium">DETECTION</span>
+        <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">DETECTION</span>
         <div className="flex gap-2">
           <button
             data-action="detect"
@@ -90,7 +90,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
       {results?.polez && (
         <>
           <ConfidenceBar label="AI Watermark" value={results.polez.detection_probability} />
-          <div className="text-xs text-zinc-500 mb-2 ml-2">
+          <div className="text-xs text-zinc-500 mb-2 ml-2 font-data">
             Ultrasonic: {(results.polez.signals.ultrasonic_score * 100).toFixed(0)}% |
             Bit Planes: {results.polez.signals.biased_planes}/8 |
             Autocorr: {(results.polez.signals.autocorr_score * 100).toFixed(0)}%
@@ -115,7 +115,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
             {Object.entries(results.watermark.method_results as Record<string, { detected: boolean; confidence: number }>).map(([name, mr]) => (
               <div key={name} className="flex justify-between text-xs">
                 <span className={mr.detected ? palette.detected.text : palette.notDetected.text}>{mr.detected ? '\u2717 ' : ''}{name}</span>
-                <span className="text-zinc-400">{(mr.confidence * 100).toFixed(1)}%</span>
+                <span className="text-zinc-400 font-data">{(mr.confidence * 100).toFixed(1)}%</span>
               </div>
             ))}
           </div>

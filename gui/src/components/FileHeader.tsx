@@ -71,13 +71,13 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
   if (fileInfo && !loading) {
     return (
       <nav className="flex flex-wrap items-center gap-2 sm:gap-4 bg-zinc-900 border-b border-zinc-700 px-4 py-3" aria-label="File information">
-        <span className="text-zinc-200 font-bold text-lg tracking-wider">POLEZ</span>
+        <span className="font-heading text-zinc-200 font-semibold text-lg tracking-tight">POLEZ</span>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-zinc-400 text-sm flex-1 min-w-0">
           <span className="text-zinc-200 font-medium truncate">{fileInfo.file_path.split('/').pop()}</span>
-          <span>{fileInfo.format.toUpperCase()}</span>
-          <span>{fileInfo.sample_rate / 1000}kHz</span>
-          <span>{fileInfo.channels}ch</span>
-          <span>{formatDuration(fileInfo.duration_secs)}</span>
+          <span className="font-data">{fileInfo.format.toUpperCase()}</span>
+          <span className="font-data">{fileInfo.sample_rate / 1000}kHz</span>
+          <span className="font-data">{fileInfo.channels}ch</span>
+          <span className="font-data">{formatDuration(fileInfo.duration_secs)}</span>
         </div>
         <button
           onClick={() => inputRef.current?.click()}
@@ -111,7 +111,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
           : 'border-zinc-600 bg-zinc-900 hover:border-zinc-500'
       }`}
     >
-      <div className="text-zinc-200 font-bold text-2xl tracking-widest mb-2">POLEZ</div>
+      <div className="font-heading text-zinc-200 font-semibold text-2xl tracking-tight mb-2">POLEZ</div>
       <div className="text-zinc-500 text-xs mb-4">Audio Forensics & Sanitization Engine</div>
       {loading ? (
         <div className="w-64 space-y-2">

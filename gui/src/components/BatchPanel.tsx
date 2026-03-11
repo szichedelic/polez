@@ -93,7 +93,7 @@ export function BatchPanel() {
   return (
     <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Batch processing">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <span className="text-zinc-400 text-sm font-medium">BATCH PROCESSING</span>
+        <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">BATCH PROCESSING</span>
         <div className="flex flex-wrap gap-2 items-center">
           <select
             value={mode}
@@ -163,12 +163,12 @@ export function BatchPanel() {
             <div key={i} className="flex items-center gap-2 text-xs bg-zinc-800 rounded px-2 py-1.5">
               <span className={statusColor(f.status)}>{statusIcon(f.status)}</span>
               <span className="text-zinc-200 flex-1 truncate">{f.file.name}</span>
-              <span className="text-zinc-500">{(f.file.size / 1024 / 1024).toFixed(1)} MB</span>
+              <span className="text-zinc-500 font-data">{(f.file.size / 1024 / 1024).toFixed(1)} MB</span>
               {f.result?.processing_time != null && (
-                <span className="text-zinc-500">{f.result.processing_time.toFixed(1)}s</span>
+                <span className="text-zinc-500 font-data">{f.result.processing_time.toFixed(1)}s</span>
               )}
               {f.result?.quality_loss != null && (
-                <span className="text-zinc-500">QL: {f.result.quality_loss.toFixed(2)}%</span>
+                <span className="text-zinc-500 font-data">QL: {f.result.quality_loss.toFixed(2)}%</span>
               )}
               {f.result?.error && (
                 <span className="text-red-400 truncate max-w-[200px]">{f.result.error}</span>

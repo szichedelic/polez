@@ -193,7 +193,7 @@ export function Spectrogram({ fileLoaded }: Props) {
   return (
     <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Spectrogram display">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <span className="text-zinc-400 text-sm font-medium">SPECTROGRAM</span>
+        <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">SPECTROGRAM</span>
         <div className="flex items-center gap-2">
           {isZoomed && (
             <button
@@ -226,7 +226,7 @@ export function Spectrogram({ fileLoaded }: Props) {
         />
       </div>
       {data && (
-        <div className="flex justify-between text-zinc-500 text-xs mt-1">
+        <div className="flex justify-between text-zinc-500 text-xs mt-1 font-data">
           <span>{data.time_start.toFixed(1)}s</span>
           <span>{(data.freq_min / 1000).toFixed(1)}kHz - {(data.freq_max / 1000).toFixed(1)}kHz</span>
           <span>{data.time_end.toFixed(1)}s</span>

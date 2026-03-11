@@ -135,7 +135,7 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
   return (
     <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="A/B audio comparison">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <span className="text-zinc-400 text-sm font-medium">A/B COMPARISON</span>
+        <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">A/B COMPARISON</span>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex gap-1" role="group" aria-label="Audio source selection">

@@ -55,7 +55,7 @@ export function MetadataViewer({ fileLoaded, hasCleaned }: Props) {
   return (
     <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Metadata tags viewer">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <span className="text-zinc-400 text-sm font-medium">METADATA TAGS</span>
+        <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">METADATA TAGS</span>
         <div className="flex flex-wrap items-center gap-2">
           {hasCleaned && before && (
             <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer">
@@ -140,12 +140,12 @@ export function MetadataViewer({ fileLoaded, hasCleaned }: Props) {
 
       {before && before.suspicious_chunks.length > 0 && (
         <div className="mt-3">
-          <span className="text-zinc-500 text-xs font-medium">SUSPICIOUS CHUNKS</span>
+          <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">SUSPICIOUS CHUNKS</span>
           <div className="mt-1 space-y-1">
             {before.suspicious_chunks.map((chunk, i) => (
               <div key={i} className="flex justify-between text-xs bg-red-950/20 rounded px-2 py-1">
                 <span className="text-red-400">{chunk.description}</span>
-                <span className="text-zinc-500 font-mono">offset 0x{chunk.offset.toString(16)}</span>
+                <span className="text-zinc-500 font-data">offset 0x{chunk.offset.toString(16)}</span>
               </div>
             ))}
           </div>
@@ -154,7 +154,7 @@ export function MetadataViewer({ fileLoaded, hasCleaned }: Props) {
 
       {before && before.anomalies.length > 0 && (
         <div className="mt-3">
-          <span className="text-zinc-500 text-xs font-medium">ANOMALIES</span>
+          <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">ANOMALIES</span>
           <div className="mt-1 space-y-1">
             {before.anomalies.map((a, i) => (
               <div key={i} className="text-xs text-yellow-400">{a}</div>

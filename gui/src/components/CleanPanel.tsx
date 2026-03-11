@@ -17,7 +17,7 @@ function ConfidenceBar({ label, value, max = 1 }: { label: string; value: number
     <div className="mb-2">
       <div className="flex justify-between text-sm mb-1">
         <span className="text-zinc-300">{indicator ? `${indicator} ${label}` : label}</span>
-        <span className="text-zinc-400">{pct.toFixed(1)}%</span>
+        <span className="text-zinc-400 font-data">{pct.toFixed(1)}%</span>
       </div>
       <div className="h-2 bg-zinc-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${label}: ${pct.toFixed(1)}%`}>
         <div className={`h-full ${bg} rounded-full`} style={{ width: `${pct}%` }} />
@@ -30,7 +30,7 @@ function DetectionColumn({ title, data }: { title: string; data: any }) {
   if (!data) return null;
   return (
     <div className="flex-1 min-w-0">
-      <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase">{title}</h4>
+      <h4 className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em] mb-2">{title}</h4>
       {data.watermark && (
         <ConfidenceBar label="Watermark" value={data.watermark.overall_confidence} />
       )}
@@ -75,15 +75,15 @@ function VerificationPanel({ verification: v }: { verification: VerResult }) {
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <div>
           <div className="text-xs text-zinc-500 mb-1">SNR</div>
-          <div className="text-sm text-zinc-200">{snrDisplay}</div>
+          <div className="text-sm text-zinc-200 font-data">{snrDisplay}</div>
         </div>
         <div>
           <div className="text-xs text-zinc-500 mb-1">Spectral Similarity</div>
-          <div className="text-sm text-zinc-200">{(v.spectral_similarity * 100).toFixed(1)}%</div>
+          <div className="text-sm text-zinc-200 font-data">{(v.spectral_similarity * 100).toFixed(1)}%</div>
         </div>
         <div>
           <div className="text-xs text-zinc-500 mb-1">Effectiveness</div>
-          <div className="text-sm text-zinc-200">{v.removal_effectiveness.toFixed(1)}%</div>
+          <div className="text-sm text-zinc-200 font-data">{v.removal_effectiveness.toFixed(1)}%</div>
         </div>
       </div>
     </div>
@@ -186,7 +186,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
   return (
     <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Sanitization controls">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <span className="text-zinc-400 text-sm font-medium">CLEAN</span>
+        <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">CLEAN</span>
         <div className="flex flex-wrap gap-2 items-center">
           {presets.length > 0 && (
             <select
@@ -264,7 +264,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
       {showAdvanced && (
         <div className="bg-zinc-800 border border-zinc-700 rounded p-3 mb-3">
           <div className="mb-3">
-            <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase">Stealth DSP Operations</h4>
+            <h4 className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em] mb-2">Stealth DSP Operations</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
               {(Object.keys(STEALTH_FLAG_LABELS) as (keyof AdvancedFlags)[]).map(key => (
                 <FlagToggle
@@ -278,7 +278,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
             </div>
           </div>
           <div>
-            <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase">Fingerprint Removal</h4>
+            <h4 className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em] mb-2">Fingerprint Removal</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
               {(Object.keys(FP_FLAG_LABELS) as (keyof FingerprintFlags)[]).map(key => (
                 <FlagToggle
@@ -304,7 +304,7 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
 
       {result && (
         <>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400 mb-3">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400 mb-3 font-data">
             <span>Quality loss: {result.quality_loss.toFixed(2)}%</span>
             <span>Time: {result.processing_time.toFixed(1)}s</span>
             <span>Metadata removed: {result.metadata_removed}</span>

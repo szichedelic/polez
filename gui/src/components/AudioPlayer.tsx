@@ -126,7 +126,7 @@ export function AudioPlayer({ fileLoaded, hasCleaned }: Props) {
           )}
         </button>
 
-        <span className="text-xs text-zinc-400 w-10 text-right shrink-0 font-mono">
+        <span className="text-xs text-zinc-400 w-10 text-right shrink-0 font-data">
           {formatTime(currentTime)}
         </span>
 
@@ -153,7 +153,7 @@ export function AudioPlayer({ fileLoaded, hasCleaned }: Props) {
           />
         </div>
 
-        <span className="text-xs text-zinc-400 w-10 shrink-0 font-mono">
+        <span className="text-xs text-zinc-400 w-10 shrink-0 font-data">
           {formatTime(duration)}
         </span>
 
