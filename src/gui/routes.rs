@@ -1304,19 +1304,35 @@ async fn batch_clean(
     let mut results = Vec::new();
 
     for task in tasks {
-        let (filename, input_path, output_path, result, st) = task.await.map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Task error: {e}"),
-            )
-        })?;
+        let (filename, input_path, output_path, result, st) = match task.await {
+            Ok(tuple) => tuple,
+            Err(e) => {
+                results.push(BatchFileResult {
+                    filename: "unknown".to_string(),
+                    success: false,
+                    error: Some(format!("Task join error: {e}")),
+                    quality_loss: None,
+                    processing_time: None,
+                    download_id: None,
+                });
+                continue;
+            }
+        };
 
-        let result = result.map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Task error: {e}"),
-            )
-        })?;
+        let result = match result {
+            Ok(r) => r,
+            Err(e) => {
+                results.push(BatchFileResult {
+                    filename,
+                    success: false,
+                    error: Some(format!("Processing panic: {e}")),
+                    quality_loss: None,
+                    processing_time: None,
+                    download_id: None,
+                });
+                continue;
+            }
+        };
 
         match result {
             (Ok(san_result), elapsed) => {
