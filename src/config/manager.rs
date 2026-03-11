@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::config::defaults::{builtin_presets, default_config};
-use crate::config::types::AppConfig;
+use crate::config::types::{AppConfig, OutputFormat};
 use crate::error::{PolezError, Result};
 
 /// Manages configuration loading, saving, validation, and preset operations.
@@ -142,9 +142,9 @@ impl ConfigManager {
                         .push(format!("POLEZ_OUTPUT_FORMAT={val} → output_format=ogg"));
                 }
                 "aac" => {
-                    self.config.output_format = OutputFormat::Aac;
-                    self.env_overrides
-                        .push(format!("POLEZ_OUTPUT_FORMAT={val} → output_format=aac"));
+                    tracing::warn!(
+                        "AAC encoding is not supported; ignoring POLEZ_OUTPUT_FORMAT=aac"
+                    );
                 }
                 _ => tracing::warn!("Unknown POLEZ_OUTPUT_FORMAT value: {val}"),
             }
@@ -216,6 +216,14 @@ impl ConfigManager {
             issues.push(ConfigIssue::error(
                 "formats.mp3.quality",
                 "must be 0-9 (0=best, 9=worst)",
+            ));
+        }
+
+        // Reject AAC output format (encoding not supported)
+        if matches!(self.config.output_format, OutputFormat::Aac) {
+            issues.push(ConfigIssue::error(
+                "output_format",
+                "AAC encoding is not supported; use wav, mp3, flac, or ogg",
             ));
         }
 
