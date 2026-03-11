@@ -1191,8 +1191,8 @@ async fn batch_clean(
         other => return Err((StatusCode::BAD_REQUEST, format!("Unknown mode: {other}"))),
     };
 
-    let mut results = Vec::new();
-    let mut download_ids = std::collections::HashMap::new();
+    // Phase 1: Read all multipart fields sequentially (stream constraint)
+    let mut file_entries: Vec<(String, std::path::PathBuf, std::path::PathBuf)> = Vec::new();
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
         (
@@ -1214,7 +1214,6 @@ async fn batch_clean(
             )
         })?;
 
-        // Write to temp input file
         let input_tmp = tempfile::Builder::new()
             .suffix(&format!(".{ext}"))
             .tempfile()
@@ -1232,7 +1231,6 @@ async fn batch_clean(
             )
         })?;
 
-        // Create output temp file
         let output_tmp = tempfile::Builder::new()
             .suffix(&format!("_cleaned.{ext}"))
             .tempfile()
@@ -1251,30 +1249,54 @@ async fn batch_clean(
             )
         })?;
 
-        let input_buf = input_path.to_path_buf();
-        let out_buf = output_path.clone();
-        let file_mode = mode;
+        file_entries.push((filename, input_path.to_path_buf(), output_path));
+    }
 
-        let result = tokio::task::spawn_blocking(move || {
-            let cfg = default_config();
-            let flags = AdvancedFlags::default();
-            let pipeline = SanitizationPipeline::new(
-                file_mode,
-                false,
-                2,
-                flags,
-                cfg.fingerprint_removal,
-                None,
-                Vec::new(),
-                None,
-                None,
-            );
-            let start = std::time::Instant::now();
-            let run_result = pipeline.run(&input_buf, &out_buf);
-            (run_result, start.elapsed())
-        })
-        .await
-        .map_err(|e| {
+    // Phase 2: Process all files concurrently
+    let mut tasks = Vec::new();
+    for (filename, input_path, output_path) in file_entries {
+        let out_buf = output_path.clone();
+        let input_buf = input_path.clone();
+        let file_mode = mode;
+        let st = state.clone();
+
+        tasks.push(tokio::spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let cfg = default_config();
+                let flags = AdvancedFlags::default();
+                let pipeline = SanitizationPipeline::new(
+                    file_mode,
+                    false,
+                    2,
+                    flags,
+                    cfg.fingerprint_removal,
+                    None,
+                    Vec::new(),
+                    None,
+                    None,
+                );
+                let start = std::time::Instant::now();
+                let run_result = pipeline.run(&input_buf, &out_buf);
+                (run_result, start.elapsed())
+            })
+            .await;
+
+            (filename, input_path, output_path, result, st)
+        }));
+    }
+
+    let mut results = Vec::new();
+    let mut download_ids = std::collections::HashMap::new();
+
+    for task in tasks {
+        let (filename, input_path, output_path, result, st) = task.await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Task error: {e}"),
+            )
+        })?;
+
+        let result = result.map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Task error: {e}"),
@@ -1285,15 +1307,14 @@ async fn batch_clean(
             (Ok(san_result), elapsed) => {
                 let id = uuid_simple();
                 {
-                    let mut s = state.write().await;
+                    let mut s = st.write().await;
                     s.temp_paths.push(output_path.clone());
-                    s.temp_paths.push(input_path.to_path_buf());
+                    s.temp_paths.push(input_path);
                 }
                 download_ids.insert(filename.clone(), id.clone());
-                // Store download path with timestamp for TTL-based cleanup
                 if let Ok(mut map) = BATCH_DOWNLOADS.lock() {
                     purge_stale_downloads(&mut map);
-                    map.insert(id, (output_path, std::time::Instant::now()));
+                    map.insert(id.clone(), (output_path, std::time::Instant::now()));
                 }
                 results.push(BatchFileResult {
                     filename,
@@ -1301,6 +1322,7 @@ async fn batch_clean(
                     error: None,
                     quality_loss: Some(san_result.quality_loss),
                     processing_time: Some(elapsed.as_secs_f64()),
+                    download_id: Some(id),
                 });
             }
             (Err(e), _) => {
@@ -1310,6 +1332,7 @@ async fn batch_clean(
                     error: Some(e.to_string()),
                     quality_loss: None,
                     processing_time: None,
+                    download_id: None,
                 });
             }
         }
