@@ -307,6 +307,7 @@ export interface BatchFileResult {
   error: string | null;
   quality_loss: number | null;
   processing_time: number | null;
+  download_id: string | null;
 }
 
 export interface BatchCleanResponse {

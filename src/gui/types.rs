@@ -228,6 +228,8 @@ pub struct BatchFileResult {
     pub quality_loss: Option<f64>,
     /// Processing time in seconds, if available.
     pub processing_time: Option<f64>,
+    /// Download ID for retrieving the cleaned file.
+    pub download_id: Option<String>,
 }
 
 /// Response body from the batch clean endpoint.
