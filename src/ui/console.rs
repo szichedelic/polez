@@ -24,40 +24,33 @@ impl ConsoleManager {
         Self { stderr_mode: true }
     }
 
+    /// Print a line to the correct output stream based on stderr_mode.
+    fn out(&self, args: std::fmt::Arguments<'_>) {
+        if self.stderr_mode {
+            eprintln!("{args}");
+        } else {
+            println!("{args}");
+        }
+    }
+
     /// Print a green success message.
     pub fn success(&self, msg: &str) {
-        if self.stderr_mode {
-            eprintln!("{}", msg.green().bold());
-        } else {
-            println!("{}", msg.green().bold());
-        }
+        self.out(format_args!("{}", msg.green().bold()));
     }
 
     /// Print a red error message.
     pub fn error(&self, msg: &str) {
-        if self.stderr_mode {
-            eprintln!("{}", msg.red().bold());
-        } else {
-            println!("{}", msg.red().bold());
-        }
+        self.out(format_args!("{}", msg.red().bold()));
     }
 
     /// Print a yellow warning message.
     pub fn warning(&self, msg: &str) {
-        if self.stderr_mode {
-            eprintln!("{}", msg.yellow().bold());
-        } else {
-            println!("{}", msg.yellow().bold());
-        }
+        self.out(format_args!("{}", msg.yellow().bold()));
     }
 
     /// Print a cyan informational message.
     pub fn info(&self, msg: &str) {
-        if self.stderr_mode {
-            eprintln!("{}", msg.cyan().bold());
-        } else {
-            println!("{}", msg.cyan().bold());
-        }
+        self.out(format_args!("{}", msg.cyan().bold()));
     }
 
     /// Print a random themed quote in magenta italic.
@@ -86,38 +79,48 @@ impl ConsoleManager {
         ];
         let mut rng = rand::thread_rng();
         if let Some(quote) = quotes.choose(&mut rng) {
-            println!("\n{}", format!("  \"{quote}\"").magenta().italic());
+            self.out(format_args!(""));
+            self.out(format_args!(
+                "{}",
+                format!("  \"{quote}\"").magenta().italic()
+            ));
         }
     }
 
     /// Display formatted audio analysis results including watermark detection and AI probability.
     pub fn display_analysis(&self, analysis: &AnalysisDisplay) {
-        println!();
-        println!("{}", "=== Audio Analysis Results ===".blue().bold());
-        println!("  File:        {}", analysis.file_path);
-        println!("  Format:      {}", analysis.format);
-        println!("  Duration:    {:.2}s", analysis.duration_secs);
-        println!("  Sample Rate: {} Hz", analysis.sample_rate);
-        println!("  Channels:    {}", analysis.channels);
-        println!();
+        self.out(format_args!(""));
+        self.out(format_args!(
+            "{}",
+            "=== Audio Analysis Results ===".blue().bold()
+        ));
+        self.out(format_args!("  File:        {}", analysis.file_path));
+        self.out(format_args!("  Format:      {}", analysis.format));
+        self.out(format_args!(
+            "  Duration:    {:.2}s",
+            analysis.duration_secs
+        ));
+        self.out(format_args!("  Sample Rate: {} Hz", analysis.sample_rate));
+        self.out(format_args!("  Channels:    {}", analysis.channels));
+        self.out(format_args!(""));
 
         if analysis.metadata_tags > 0 {
-            println!(
+            self.out(format_args!(
                 "  Metadata Tags:      {}",
                 format!("{}", analysis.metadata_tags).yellow()
-            );
+            ));
         }
         if analysis.suspicious_chunks > 0 {
-            println!(
+            self.out(format_args!(
                 "  Suspicious Chunks:  {}",
                 format!("{}", analysis.suspicious_chunks).red()
-            );
+            ));
         }
 
         // Watermark detection results
         if let Some(ref watermarks) = analysis.watermark_results {
-            println!();
-            println!("  {}", "Watermark Detection:".cyan().bold());
+            self.out(format_args!(""));
+            self.out(format_args!("  {}", "Watermark Detection:".cyan().bold()));
             for (method, detected, confidence) in watermarks {
                 let status = if *detected {
                     format!("DETECTED (confidence: {confidence:.2})")
@@ -127,13 +130,17 @@ impl ConsoleManager {
                 } else {
                     "not detected".dimmed().to_string()
                 };
-                println!("    {:<22} {}", format!("{}:", method), status);
+                self.out(format_args!(
+                    "    {:<22} {}",
+                    format!("{}:", method),
+                    status
+                ));
             }
         }
 
         // AI probability
         if let Some(ai_prob) = analysis.ai_probability {
-            println!();
+            self.out(format_args!(""));
             let prob_str = format!("{:.0}%", ai_prob * 100.0);
             let colored_prob = if ai_prob > 0.7 {
                 prob_str.red().bold().to_string()
@@ -142,7 +149,9 @@ impl ConsoleManager {
             } else {
                 prob_str.green().bold().to_string()
             };
-            println!("  AI Probability:     {colored_prob} ({ai_prob:.2})");
+            self.out(format_args!(
+                "  AI Probability:     {colored_prob} ({ai_prob:.2})"
+            ));
         }
 
         let threat_str = format!("{}", analysis.threats_found);
@@ -152,39 +161,66 @@ impl ConsoleManager {
             "MEDIUM" => level_str.yellow().bold().to_string(),
             _ => level_str.green().bold().to_string(),
         };
-        println!();
-        println!("  Threats Found:      {threat_str}");
-        println!("  Threat Level:       {colored_level}");
-        println!();
+        self.out(format_args!(""));
+        self.out(format_args!("  Threats Found:      {threat_str}"));
+        self.out(format_args!("  Threat Level:       {colored_level}"));
+        self.out(format_args!(""));
     }
 
     /// Display sanitization pipeline results (metadata removed, patterns suppressed, etc.).
     pub fn display_results(&self, results: &SanitizationDisplay) {
-        println!();
-        println!("{}", "=== Sanitization Results ===".green().bold());
+        self.out(format_args!(""));
+        self.out(format_args!(
+            "{}",
+            "=== Sanitization Results ===".green().bold()
+        ));
         let status = if results.success {
             "SUCCESS".green().bold().to_string()
         } else {
             "FAILED".red().bold().to_string()
         };
-        println!("  Status:              {status}");
-        println!("  Metadata Removed:    {}", results.metadata_removed);
-        println!("  Patterns Found:      {}", results.patterns_found);
-        println!("  Patterns Suppressed: {}", results.patterns_suppressed);
-        println!("  Quality Loss:        {:.2}%", results.quality_loss);
-        println!("  Processing Time:     {:.2}s", results.processing_time);
+        self.out(format_args!("  Status:              {status}"));
+        self.out(format_args!(
+            "  Metadata Removed:    {}",
+            results.metadata_removed
+        ));
+        self.out(format_args!(
+            "  Patterns Found:      {}",
+            results.patterns_found
+        ));
+        self.out(format_args!(
+            "  Patterns Suppressed: {}",
+            results.patterns_suppressed
+        ));
+        self.out(format_args!(
+            "  Quality Loss:        {:.2}%",
+            results.quality_loss
+        ));
+        self.out(format_args!(
+            "  Processing Time:     {:.2}s",
+            results.processing_time
+        ));
         if let Some(ref path) = results.output_file {
-            println!("  Output File:         {path}");
+            self.out(format_args!("  Output File:         {path}"));
         }
-        println!();
+        self.out(format_args!(""));
     }
 
     /// Display before/after verification results with SNR, spectral similarity, and verdict.
     pub fn display_verification(&self, v: &VerificationDisplay) {
-        println!();
-        println!("{}", "=== Verification Results ===".blue().bold());
-        println!("  Original Threats:      {}", v.original_threats);
-        println!("  Remaining Threats:     {}", v.remaining_threats);
+        self.out(format_args!(""));
+        self.out(format_args!(
+            "{}",
+            "=== Verification Results ===".blue().bold()
+        ));
+        self.out(format_args!(
+            "  Original Threats:      {}",
+            v.original_threats
+        ));
+        self.out(format_args!(
+            "  Remaining Threats:     {}",
+            v.remaining_threats
+        ));
 
         let eff = v.removal_effectiveness;
         let eff_str = format!("{eff:.1}%");
@@ -195,15 +231,15 @@ impl ConsoleManager {
         } else {
             eff_str.red().bold().to_string()
         };
-        println!("  Removal Effectiveness: {colored_eff}");
-        println!(
+        self.out(format_args!("  Removal Effectiveness: {colored_eff}"));
+        self.out(format_args!(
             "  Hash Changed:          {}",
             if v.hash_different {
                 "Yes".green().to_string()
             } else {
                 "No".red().to_string()
             }
-        );
+        ));
 
         // SNR and quality metrics
         if let Some(snr) = v.snr_db {
@@ -215,11 +251,11 @@ impl ConsoleManager {
             } else {
                 snr_str.red().to_string()
             };
-            println!("  SNR:                   {colored_snr}");
+            self.out(format_args!("  SNR:                   {colored_snr}"));
         }
 
         if let Some(sim) = v.spectral_similarity {
-            println!("  Spectral Similarity:   {sim:.4}");
+            self.out(format_args!("  Spectral Similarity:   {sim:.4}"));
         }
 
         if let Some(quality) = v.quality_score {
@@ -231,7 +267,7 @@ impl ConsoleManager {
             } else {
                 q_str.red().to_string()
             };
-            println!("  Quality Preservation:  {colored_q}");
+            self.out(format_args!("  Quality Preservation:  {colored_q}"));
         }
 
         // Verdict
@@ -242,71 +278,77 @@ impl ConsoleManager {
                 "red" => verdict_text.red().bold().to_string(),
                 _ => verdict_text.to_string(),
             };
-            println!();
-            println!("  Verdict: {colored_verdict}");
+            self.out(format_args!(""));
+            self.out(format_args!("  Verdict: {colored_verdict}"));
         }
 
-        println!();
+        self.out(format_args!(""));
     }
 
     /// Display configuration as a list of key-value pairs.
     pub fn display_config(&self, items: &[(String, String)]) {
-        println!();
-        println!("{}", "=== Configuration ===".blue().bold());
+        self.out(format_args!(""));
+        self.out(format_args!("{}", "=== Configuration ===".blue().bold()));
         for (key, value) in items {
-            println!("  {key:<30} {value}");
+            self.out(format_args!("  {key:<30} {value}"));
         }
-        println!();
+        self.out(format_args!(""));
     }
 
     /// Display configuration from a HashMap, sorted by key.
     pub fn display_config_map(&self, config: &HashMap<String, String>) {
-        println!();
-        println!("{}", "=== Configuration ===".blue().bold());
+        self.out(format_args!(""));
+        self.out(format_args!("{}", "=== Configuration ===".blue().bold()));
         let mut keys: Vec<_> = config.keys().collect();
         keys.sort();
         for key in keys {
-            println!("  {:<30} {}", key, config[key]);
+            self.out(format_args!("  {:<30} {}", key, config[key]));
         }
-        println!();
+        self.out(format_args!(""));
     }
 
     /// Display batch processing summary with success/failure counts and timing.
     pub fn display_batch_summary(&self, summary: &BatchSummaryDisplay) {
-        println!();
-        println!("{}", "=== Batch Processing Summary ===".green().bold());
-        println!("  Total Files:     {}", summary.total);
-        println!(
+        self.out(format_args!(""));
+        self.out(format_args!(
+            "{}",
+            "=== Batch Processing Summary ===".green().bold()
+        ));
+        self.out(format_args!("  Total Files:     {}", summary.total));
+        self.out(format_args!(
             "  Successful:      {}",
             format!("{}", summary.success).green()
-        );
-        println!(
+        ));
+        self.out(format_args!(
             "  Failed:          {}",
             if summary.failed > 0 {
                 format!("{}", summary.failed).red().to_string()
             } else {
                 "0".to_string()
             }
-        );
-        println!("  Total Time:      {:.1}s", summary.total_time);
+        ));
+        self.out(format_args!(
+            "  Total Time:      {:.1}s",
+            summary.total_time
+        ));
         if summary.total > 0 {
-            println!(
+            self.out(format_args!(
                 "  Avg per File:    {:.2}s",
                 summary.total_time / summary.total as f64
-            );
+            ));
         }
         if let Some(ref dir) = summary.output_dir {
-            println!("  Output Dir:      {dir}");
+            self.out(format_args!("  Output Dir:      {dir}"));
         }
 
         if !summary.failed_files.is_empty() {
-            println!();
-            println!("  {}", "Failed Files:".red().bold());
+            self.out(format_args!(""));
+            self.out(format_args!("  {}", "Failed Files:".red().bold()));
             for (file, error) in &summary.failed_files {
-                println!("    - {file}: {error}");
+                self.out(format_args!("    - {file}: {error}"));
             }
         }
-        println!();
+        self.out(format_args!(""));
     }
 }
 

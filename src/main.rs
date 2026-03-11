@@ -195,14 +195,18 @@ fn main() {
     } else {
         ConsoleManager::new()
     };
-    let banner = BannerManager::new();
+    let banner = if json_mode {
+        BannerManager::stderr()
+    } else {
+        BannerManager::new()
+    };
 
     if !quiet_mode {
         banner.show_main_banner();
         console.warning("LEGAL DISCLAIMER: This tool is for AUTHORIZED SECURITY RESEARCH ONLY");
         console.info("  Use only on files you own or have explicit permission to modify");
         console.info("  You are responsible for compliance with applicable laws");
-        println!();
+        console.info("");
     }
 
     if let Err(e) = run_command(cli.command, json_mode, &console, &banner) {
@@ -339,7 +343,7 @@ fn run_command(
         Commands::Fingerprint { files } => cmd_fingerprint(&files, json_mode, console),
         Commands::Config { action } => cmd_config(action, console),
         Commands::Version => {
-            BannerManager::new().show_version_info();
+            banner.show_version_info();
             Ok(())
         }
     }
