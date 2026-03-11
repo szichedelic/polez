@@ -13,8 +13,13 @@ body {
   overflow-x: hidden;
 }
 
-/* Focus rings */
-*:focus-visible {
+/* Focus rings — scoped to interactive elements */
+button:focus-visible,
+a:focus-visible,
+input:not([type="range"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px #09090b, 0 0 0 4px rgb(113 113 122 / 0.4);
 }
