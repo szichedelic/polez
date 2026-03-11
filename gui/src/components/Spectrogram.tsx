@@ -2,6 +2,29 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { getSpectrogram, type SpectrogramData } from '../api/client';
 import { Card } from './Card';
 
+// Viridis colormap — 16 control points, linearly interpolated to 256
+const VIRIDIS_CTRL: [number, number, number][] = [
+  [68,1,84],[72,26,108],[71,47,126],[65,68,135],[57,86,140],
+  [49,104,142],[42,120,142],[35,137,142],[30,152,138],[34,168,132],
+  [53,183,121],[80,196,106],[115,208,86],[158,217,59],[204,225,30],[253,231,37],
+];
+
+function buildViridisLUT(): Uint8Array {
+  const lut = new Uint8Array(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const t = (i / 255) * (VIRIDIS_CTRL.length - 1);
+    const lo = Math.floor(t);
+    const hi = Math.min(lo + 1, VIRIDIS_CTRL.length - 1);
+    const f = t - lo;
+    lut[i * 3]     = Math.round(VIRIDIS_CTRL[lo][0] + (VIRIDIS_CTRL[hi][0] - VIRIDIS_CTRL[lo][0]) * f);
+    lut[i * 3 + 1] = Math.round(VIRIDIS_CTRL[lo][1] + (VIRIDIS_CTRL[hi][1] - VIRIDIS_CTRL[lo][1]) * f);
+    lut[i * 3 + 2] = Math.round(VIRIDIS_CTRL[lo][2] + (VIRIDIS_CTRL[hi][2] - VIRIDIS_CTRL[lo][2]) * f);
+  }
+  return lut;
+}
+
+const VIRIDIS = buildViridisLUT();
+
 interface Props {
   fileLoaded: boolean;
 }
@@ -31,6 +54,7 @@ export function Spectrogram({ fileLoaded }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedView, setDebouncedView] = useState<ViewRange>(DEFAULT_VIEW);
   const [fullDuration, setFullDuration] = useState(0);
+  const [dbRange, setDbRange] = useState<[number, number]>([0, 0]);
   const [cssTransform, setCssTransform] = useState('');
   const prevViewRef = useRef<ViewRange>(DEFAULT_VIEW);
   const pinchStartDist = useRef<number | null>(null);
@@ -87,6 +111,7 @@ export function Spectrogram({ fileLoaded }: Props) {
         if (val < minDb && val > -120) minDb = val;
       }
     }
+    setDbRange([minDb, maxDb]);
 
     const imageData = ctx.createImageData(num_time_frames, num_freq_bins);
 
@@ -94,16 +119,13 @@ export function Spectrogram({ fileLoaded }: Props) {
       for (let f = 0; f < num_freq_bins; f++) {
         const val = magnitudes[t][f];
         const norm = Math.max(0, Math.min(1, (val - minDb) / (maxDb - minDb)));
-
-        const r = Math.floor(norm * 255);
-        const g = Math.floor(norm * 128 + (1 - norm) * 20);
-        const b = Math.floor((1 - norm) * 200 + norm * 50);
+        const ci = Math.round(norm * 255) * 3;
 
         const y = num_freq_bins - 1 - f;
         const idx = (y * num_time_frames + t) * 4;
-        imageData.data[idx] = r;
-        imageData.data[idx + 1] = g;
-        imageData.data[idx + 2] = b;
+        imageData.data[idx]     = VIRIDIS[ci];
+        imageData.data[idx + 1] = VIRIDIS[ci + 1];
+        imageData.data[idx + 2] = VIRIDIS[ci + 2];
         imageData.data[idx + 3] = 255;
       }
     }
@@ -335,27 +357,43 @@ export function Spectrogram({ fileLoaded }: Props) {
         </div>
       )}
 
-      <div
-        ref={containerRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        className="relative overflow-hidden"
-        style={{ cursor: dragging ? 'grabbing' : 'grab' }}
-      >
-        <canvas
-          ref={canvasRef}
-          className="w-full h-48 rounded"
-          style={{
-            imageRendering: 'pixelated',
-            transform: cssTransform || undefined,
-            transformOrigin: '0 0',
-            transition: cssTransform ? 'none' : undefined,
-          }}
-          aria-label="Spectrogram frequency visualization"
-          role="img"
-        />
+      <div className="flex gap-2">
+        <div
+          ref={containerRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className="relative overflow-hidden flex-1"
+          style={{ cursor: dragging ? 'grabbing' : 'grab' }}
+        >
+          <canvas
+            ref={canvasRef}
+            className="w-full h-48 rounded"
+            style={{
+              imageRendering: 'pixelated',
+              transform: cssTransform || undefined,
+              transformOrigin: '0 0',
+              transition: cssTransform ? 'none' : undefined,
+            }}
+            aria-label="Spectrogram frequency visualization"
+            role="img"
+          />
+        </div>
+        {/* dB colorbar */}
+        {data && (
+          <div className="flex flex-col items-center justify-between h-48 shrink-0">
+            <span className="text-zinc-500 text-[0.6rem] font-data">{dbRange[1].toFixed(0)}</span>
+            <div
+              className="w-3 flex-1 my-0.5 rounded-sm"
+              style={{
+                background: `linear-gradient(to bottom, rgb(253,231,37), rgb(115,208,86), rgb(35,137,142), rgb(65,68,135), rgb(68,1,84))`,
+              }}
+            />
+            <span className="text-zinc-500 text-[0.6rem] font-data">{dbRange[0].toFixed(0)}</span>
+            <span className="text-zinc-600 text-[0.55rem]">dB</span>
+          </div>
+        )}
       </div>
       {data && (
         <div className="flex justify-between text-zinc-500 text-xs mt-1 font-data">
