@@ -17,7 +17,7 @@ const DEFAULT_VIEW: ViewRange = {
   freqMin: 0,
   freqMax: 24000,
   timeStart: 0,
-  duration: 0, // 0 means full duration
+  duration: 0,
 };
 
 export function Spectrogram({ fileLoaded }: Props) {
@@ -30,8 +30,12 @@ export function Spectrogram({ fileLoaded }: Props) {
   const dragStart = useRef<{ x: number; y: number; view: ViewRange } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedView, setDebouncedView] = useState<ViewRange>(DEFAULT_VIEW);
+  const [fullDuration, setFullDuration] = useState(0);
+  const [cssTransform, setCssTransform] = useState('');
+  const prevViewRef = useRef<ViewRange>(DEFAULT_VIEW);
+  const pinchStartDist = useRef<number | null>(null);
+  const pinchStartView = useRef<ViewRange | null>(null);
 
-  // Debounce view changes so API calls don't fire on every scroll tick
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -52,6 +56,11 @@ export function Spectrogram({ fileLoaded }: Props) {
       if (debouncedView.duration > 0) opts.duration = debouncedView.duration;
       const d = await getSpectrogram(opts);
       setData(d);
+      if (debouncedView.duration === 0 && debouncedView.timeStart === 0) {
+        setFullDuration(d.time_end - d.time_start);
+      }
+      setCssTransform('');
+      prevViewRef.current = debouncedView;
     } finally {
       setLoading(false);
     }
@@ -105,7 +114,26 @@ export function Spectrogram({ fileLoaded }: Props) {
   const dataRef = useRef(data);
   dataRef.current = data;
 
-  // Attach wheel listener as non-passive so preventDefault works
+  // Compute CSS transform for instant visual feedback during zoom/pan
+  const applyCssTransform = useCallback((newView: ViewRange) => {
+    const prev = prevViewRef.current;
+    const d = dataRef.current;
+    if (!d) return;
+
+    const prevTimeRange = prev.duration > 0 ? prev.duration : (d.time_end - d.time_start);
+    const newTimeRange = newView.duration > 0 ? newView.duration : prevTimeRange;
+    const prevFreqRange = prev.freqMax - prev.freqMin;
+    const newFreqRange = newView.freqMax - newView.freqMin;
+
+    const scaleX = prevTimeRange / newTimeRange;
+    const scaleY = prevFreqRange / newFreqRange;
+    const translateX = -((newView.timeStart - prev.timeStart) / prevTimeRange) * 100;
+    const translateY = ((newView.freqMin - prev.freqMin) / prevFreqRange) * 100;
+
+    setCssTransform(`translate(${translateX}%, ${translateY}%) scale(${scaleX}, ${scaleY})`);
+  }, []);
+
+  // Wheel zoom
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -138,18 +166,86 @@ export function Spectrogram({ fileLoaded }: Props) {
         const newFreqMax = Math.min(24000, newFreqMin + newFreqRange);
         const newTimeStart = Math.max(0, timeCenter - newTimeRange * xFrac);
 
-        return {
+        const newView = {
           freqMin: Math.round(newFreqMin),
           freqMax: Math.round(newFreqMax),
           timeStart: Math.round(newTimeStart * 100) / 100,
           duration: Math.round(newTimeRange * 100) / 100,
         };
+        applyCssTransform(newView);
+        return newView;
       });
     };
 
     container.addEventListener('wheel', onWheel, { passive: false });
     return () => container.removeEventListener('wheel', onWheel);
-  }, []);
+  }, [applyCssTransform]);
+
+  // Touch pinch-to-zoom
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const getTouchDist = (e: TouchEvent) => {
+      const [a, b] = [e.touches[0], e.touches[1]];
+      return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        pinchStartDist.current = getTouchDist(e);
+        setView(prev => { pinchStartView.current = { ...prev }; return prev; });
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchStartDist.current && pinchStartView.current) {
+        e.preventDefault();
+        const d = dataRef.current;
+        if (!d) return;
+
+        const currentDist = getTouchDist(e);
+        const scale = pinchStartDist.current / currentDist;
+        const sv = pinchStartView.current;
+        const timeRange = sv.duration > 0 ? sv.duration : (d.time_end - d.time_start);
+        const freqRange = sv.freqMax - sv.freqMin;
+
+        const newTimeRange = Math.max(0.5, timeRange * scale);
+        const newFreqRange = Math.max(500, Math.min(24000, freqRange * scale));
+
+        const timeMid = sv.timeStart + timeRange / 2;
+        const freqMid = sv.freqMin + freqRange / 2;
+
+        const newTimeStart = Math.max(0, timeMid - newTimeRange / 2);
+        const newFreqMin = Math.max(0, freqMid - newFreqRange / 2);
+        const newFreqMax = Math.min(24000, newFreqMin + newFreqRange);
+
+        const newView = {
+          freqMin: Math.round(newFreqMin),
+          freqMax: Math.round(newFreqMax),
+          timeStart: Math.round(newTimeStart * 100) / 100,
+          duration: Math.round(newTimeRange * 100) / 100,
+        };
+        applyCssTransform(newView);
+        setView(newView);
+      }
+    };
+
+    const onTouchEnd = () => {
+      pinchStartDist.current = null;
+      pinchStartView.current = null;
+    };
+
+    container.addEventListener('touchstart', onTouchStart, { passive: false });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd);
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [applyCssTransform]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -172,13 +268,15 @@ export function Spectrogram({ fileLoaded }: Props) {
     const newFreqMin = Math.max(0, sv.freqMin + dy * freqRange);
     const newFreqMax = Math.min(24000, newFreqMin + freqRange);
 
-    setView({
+    const newView = {
       freqMin: Math.round(newFreqMin),
       freqMax: Math.round(newFreqMax),
       timeStart: Math.round(newTimeStart * 100) / 100,
       duration: sv.duration,
-    });
-  }, [dragging, data]);
+    };
+    applyCssTransform(newView);
+    setView(newView);
+  }, [dragging, data, applyCssTransform]);
 
   const handleMouseUp = useCallback(() => {
     setDragging(false);
@@ -187,41 +285,74 @@ export function Spectrogram({ fileLoaded }: Props) {
 
   const resetZoom = useCallback(() => {
     setView(DEFAULT_VIEW);
+    setCssTransform('');
   }, []);
 
   const isZoomed = view.freqMin !== 0 || view.freqMax !== 24000 || view.timeStart !== 0 || view.duration !== 0;
+
+  // Compute zoom level and viewport info
+  const currentTimeRange = view.duration > 0 ? view.duration : fullDuration;
+  const zoomPercent = fullDuration > 0 ? Math.round((fullDuration / currentTimeRange) * 100) : 100;
+  const viewTimeEnd = view.timeStart + currentTimeRange;
+
+  // Minimap viewport fraction
+  const minimapLeft = fullDuration > 0 ? (view.timeStart / fullDuration) * 100 : 0;
+  const minimapWidth = fullDuration > 0 ? (currentTimeRange / fullDuration) * 100 : 100;
 
   return (
     <Card label="Spectrogram display">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">SPECTROGRAM</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {isZoomed && (
+            <span className="text-zinc-500 text-xs font-data">
+              {view.timeStart.toFixed(1)}s – {viewTimeEnd.toFixed(1)}s
+              {fullDuration > 0 && <span className="text-zinc-600"> / {fullDuration.toFixed(1)}s</span>}
+              <span className="text-zinc-600 ml-1.5">{zoomPercent}%</span>
+            </span>
+          )}
           {isZoomed && (
             <button
               onClick={resetZoom}
               className="text-zinc-500 hover:text-zinc-300 text-xs min-h-[44px] sm:min-h-0"
               aria-label="Reset spectrogram zoom"
             >
-              Reset zoom
+              Reset
             </button>
           )}
           {loading && <span className="text-zinc-400 text-xs" aria-live="polite">Loading...</span>}
           <span className="text-zinc-600 text-xs hidden sm:inline">Scroll to zoom, drag to pan</span>
         </div>
       </div>
+
+      {/* Minimap overview */}
+      {isZoomed && fullDuration > 0 && (
+        <div className="relative h-1.5 bg-zinc-900 rounded-full mb-2 overflow-hidden">
+          <div
+            className="absolute top-0 h-full bg-zinc-600 rounded-full"
+            style={{ left: `${minimapLeft}%`, width: `${Math.max(minimapWidth, 1)}%` }}
+          />
+        </div>
+      )}
+
       <div
         ref={containerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        className="relative"
+        className="relative overflow-hidden"
         style={{ cursor: dragging ? 'grabbing' : 'grab' }}
       >
         <canvas
           ref={canvasRef}
           className="w-full h-48 rounded"
-          style={{ imageRendering: 'pixelated' }}
+          style={{
+            imageRendering: 'pixelated',
+            transform: cssTransform || undefined,
+            transformOrigin: '0 0',
+            transition: cssTransform ? 'none' : undefined,
+          }}
           aria-label="Spectrogram frequency visualization"
           role="img"
         />
@@ -229,7 +360,7 @@ export function Spectrogram({ fileLoaded }: Props) {
       {data && (
         <div className="flex justify-between text-zinc-500 text-xs mt-1 font-data">
           <span>{data.time_start.toFixed(1)}s</span>
-          <span>{(data.freq_min / 1000).toFixed(1)}kHz - {(data.freq_max / 1000).toFixed(1)}kHz</span>
+          <span>{(data.freq_min / 1000).toFixed(1)}kHz – {(data.freq_max / 1000).toFixed(1)}kHz</span>
           <span>{data.time_end.toFixed(1)}s</span>
         </div>
       )}
