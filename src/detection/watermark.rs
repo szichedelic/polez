@@ -11,6 +11,58 @@ use serde::Serialize;
 use crate::audio::AudioBuffer;
 use crate::sanitization::dsp::{hilbert, stats, stft};
 
+/// Reliability tier for a detection method.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReliabilityTier {
+    /// Method validated against known watermark implementations.
+    Validated,
+    /// Method uses sound heuristics but lacks ground-truth validation.
+    #[default]
+    Heuristic,
+    /// Method has high false positive rate; results are advisory only.
+    Experimental,
+}
+
+impl ReliabilityTier {
+    /// Weight multiplier for confidence scoring.
+    pub fn weight(self) -> f64 {
+        match self {
+            ReliabilityTier::Validated => 1.0,
+            ReliabilityTier::Heuristic => 0.7,
+            ReliabilityTier::Experimental => 0.2,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ReliabilityTier::Validated => "validated",
+            ReliabilityTier::Heuristic => "heuristic",
+            ReliabilityTier::Experimental => "experimental",
+        }
+    }
+}
+
+impl std::fmt::Display for ReliabilityTier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Returns the reliability tier for a given detection method name.
+pub fn method_reliability(method: &str) -> ReliabilityTier {
+    match method {
+        // These detectors trigger on normal audio characteristics (room reflections,
+        // broadband audio, compressed stereo, normal M/S ratios).
+        "echo_signatures" | "frequency_domain" | "phase_coherence" | "spatial_encoding" => {
+            ReliabilityTier::Experimental
+        }
+        // Remaining detectors use sound signal-analysis heuristics but lack
+        // ground-truth calibration against known watermarked files.
+        _ => ReliabilityTier::Heuristic,
+    }
+}
+
 /// Results from watermark detection.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct WatermarkResult {
@@ -33,6 +85,8 @@ pub struct WatermarkDetection {
     pub confidence: f64,
     /// Human-readable description of the finding.
     pub description: String,
+    /// Reliability tier of this detection method.
+    pub reliability: ReliabilityTier,
 }
 
 /// Result from an individual detection method.
@@ -44,7 +98,10 @@ pub struct MethodResult {
     pub confidence: f64,
     /// Descriptive detail strings about the findings.
     pub details: Vec<String>,
+    /// Reliability tier of this detection method.
+    pub reliability: ReliabilityTier,
 }
+
 
 /// Known watermark carrier frequencies (Hz).
 const WATERMARK_FREQS: [f64; 4] = [18000.0, 19000.0, 20000.0, 21000.0];
@@ -111,11 +168,14 @@ impl WatermarkDetector {
             .collect();
 
         for (name, mr) in mono_results {
+            let reliability = method_reliability(&name);
+            let mr = MethodResult { reliability, ..mr };
             if mr.detected {
                 result.detected.push(WatermarkDetection {
                     method: name.clone(),
                     confidence: mr.confidence,
                     description: mr.details.first().cloned().unwrap_or_default(),
+                    reliability,
                 });
                 result.watermark_count += 1;
             }
@@ -150,11 +210,14 @@ impl WatermarkDetector {
         );
 
         if let Some(mr) = phase_mr {
+            let reliability = method_reliability("phase_coherence");
+            let mr = MethodResult { reliability, ..mr };
             if mr.detected {
                 result.detected.push(WatermarkDetection {
                     method: "phase_coherence".to_string(),
                     confidence: mr.confidence,
                     description: mr.details.first().cloned().unwrap_or_default(),
+                    reliability,
                 });
                 result.watermark_count += 1;
             }
@@ -169,21 +232,32 @@ impl WatermarkDetector {
             } else {
                 "spectral_insertion"
             };
+            let reliability = method_reliability(method_name);
+            let mr = MethodResult { reliability, ..mr };
             if mr.detected {
                 result.detected.push(WatermarkDetection {
                     method: method_name.to_string(),
                     confidence: mr.confidence,
                     description: mr.details.first().cloned().unwrap_or_default(),
+                    reliability,
                 });
                 result.watermark_count += 1;
             }
             result.method_results.insert(method_name.to_string(), mr);
         }
 
+        // Weight overall confidence by reliability tier so experimental
+        // detectors do not inflate the score.
         result.overall_confidence = if result.detected.is_empty() {
             0.0
         } else {
-            result.detected.iter().map(|d| d.confidence).sum::<f64>() / result.detected.len() as f64
+            let weighted_sum: f64 = result
+                .detected
+                .iter()
+                .map(|d| d.confidence * d.reliability.weight())
+                .sum();
+            let weight_total: f64 = result.detected.iter().map(|d| d.reliability.weight()).sum();
+            weighted_sum / weight_total
         };
 
         result

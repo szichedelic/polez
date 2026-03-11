@@ -457,10 +457,17 @@ fn cmd_clean(
     let watermark_result = WatermarkDetector::detect_all(&audio_buf);
 
     if !json_mode {
-        let watermark_display: Vec<(String, bool, f64)> = watermark_result
+        let watermark_display: Vec<(String, bool, f64, String)> = watermark_result
             .method_results
             .iter()
-            .map(|(name, mr)| (name.clone(), mr.detected, mr.confidence))
+            .map(|(name, mr)| {
+                (
+                    name.clone(),
+                    mr.detected,
+                    mr.confidence,
+                    mr.reliability.label().to_string(),
+                )
+            })
             .collect();
 
         let threats_found = scan_result.tags.len()
@@ -961,10 +968,17 @@ fn cmd_detect(
         return print_json(&json_report);
     }
 
-    let watermark_display: Vec<(String, bool, f64)> = watermark_result
+    let watermark_display: Vec<(String, bool, f64, String)> = watermark_result
         .method_results
         .iter()
-        .map(|(name, mr)| (name.clone(), mr.detected, mr.confidence))
+        .map(|(name, mr)| {
+            (
+                name.clone(),
+                mr.detected,
+                mr.confidence,
+                mr.reliability.label().to_string(),
+            )
+        })
         .collect();
 
     let ai_probability = stat_result.as_ref().map(|s| s.ai_probability);

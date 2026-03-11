@@ -121,19 +121,34 @@ impl ConsoleManager {
         if let Some(ref watermarks) = analysis.watermark_results {
             self.out(format_args!(""));
             self.out(format_args!("  {}", "Watermark Detection:".cyan().bold()));
-            for (method, detected, confidence) in watermarks {
+            for (method, detected, confidence, reliability) in watermarks {
+                let tier_tag = match reliability.as_str() {
+                    "experimental" => format!(" [{}]", "experimental".yellow()),
+                    "validated" => String::new(),
+                    tier => format!(" [{}]", tier.dimmed()),
+                };
                 let status = if *detected {
-                    format!("DETECTED (confidence: {confidence:.2})")
-                        .red()
-                        .bold()
+                    if reliability == "experimental" {
+                        format!(
+                            "DETECTED (confidence: {confidence:.2}) — {}",
+                            "high false-positive rate".yellow()
+                        )
+                        .yellow()
                         .to_string()
+                    } else {
+                        format!("DETECTED (confidence: {confidence:.2})")
+                            .red()
+                            .bold()
+                            .to_string()
+                    }
                 } else {
                     "not detected".dimmed().to_string()
                 };
                 self.out(format_args!(
-                    "    {:<22} {}",
+                    "    {:<22} {}{}",
                     format!("{}:", method),
-                    status
+                    status,
+                    tier_tag
                 ));
             }
         }
@@ -374,8 +389,8 @@ pub struct AnalysisDisplay {
     pub threats_found: usize,
     /// Threat severity label (e.g. "HIGH", "MEDIUM", "LOW").
     pub threat_level: String,
-    /// Per-method watermark results: (method name, detected, confidence).
-    pub watermark_results: Option<Vec<(String, bool, f64)>>,
+    /// Per-method watermark results: (method name, detected, confidence, reliability tier).
+    pub watermark_results: Option<Vec<(String, bool, f64, String)>>,
     /// Estimated probability the audio is AI-generated.
     pub ai_probability: Option<f64>,
 }
