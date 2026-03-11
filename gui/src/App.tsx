@@ -85,10 +85,29 @@ function App() {
           aria-modal="true"
           aria-label="Keyboard shortcuts"
           onClick={() => setShowShortcuts(false)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setShowShortcuts(false); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowShortcuts(false);
+            if (e.key === 'Tab') {
+              const dialog = e.currentTarget.querySelector('[data-shortcuts-dialog]') as HTMLElement | null;
+              if (!dialog) return;
+              const focusable = dialog.querySelectorAll<HTMLElement>('button, [tabindex]');
+              if (focusable.length === 0) return;
+              const first = focusable[0];
+              const last = focusable[focusable.length - 1];
+              if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+              } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+              }
+            }
+          }}
         >
           <div
             className="bg-zinc-800 border border-zinc-600 rounded-lg p-6 max-w-sm"
+            data-shortcuts-dialog
+            ref={(el) => el?.querySelector('button')?.focus()}
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-zinc-100 font-bold text-lg mb-4">Keyboard Shortcuts</h2>
