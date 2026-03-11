@@ -131,6 +131,21 @@ impl ConfigManager {
                     self.env_overrides
                         .push(format!("POLEZ_OUTPUT_FORMAT={val} → output_format=wav"));
                 }
+                "flac" => {
+                    self.config.output_format = OutputFormat::Flac;
+                    self.env_overrides
+                        .push(format!("POLEZ_OUTPUT_FORMAT={val} → output_format=flac"));
+                }
+                "ogg" => {
+                    self.config.output_format = OutputFormat::Ogg;
+                    self.env_overrides
+                        .push(format!("POLEZ_OUTPUT_FORMAT={val} → output_format=ogg"));
+                }
+                "aac" => {
+                    self.config.output_format = OutputFormat::Aac;
+                    self.env_overrides
+                        .push(format!("POLEZ_OUTPUT_FORMAT={val} → output_format=aac"));
+                }
                 _ => tracing::warn!("Unknown POLEZ_OUTPUT_FORMAT value: {val}"),
             }
         }

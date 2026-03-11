@@ -1544,9 +1544,9 @@ fn cmd_config(action: Option<ConfigAction>, console: &ConsoleManager) -> error::
                 FormatChoice::Preserve => config::OutputFormat::Preserve,
                 FormatChoice::Mp3 => config::OutputFormat::Mp3,
                 FormatChoice::Wav => config::OutputFormat::Wav,
-                FormatChoice::Flac | FormatChoice::Ogg | FormatChoice::Aac => {
-                    config::OutputFormat::Preserve
-                }
+                FormatChoice::Flac => config::OutputFormat::Flac,
+                FormatChoice::Ogg => config::OutputFormat::Ogg,
+                FormatChoice::Aac => config::OutputFormat::Aac,
             };
             preset_config.backup_originals = backup;
             preset_config.verification.auto_verify = verify;

@@ -105,6 +105,12 @@ pub enum OutputFormat {
     Mp3,
     /// Encode output as WAV.
     Wav,
+    /// Encode output as FLAC.
+    Flac,
+    /// Encode output as Ogg Vorbis.
+    Ogg,
+    /// Encode output as AAC.
+    Aac,
 }
 
 impl std::fmt::Display for OutputFormat {
@@ -113,6 +119,9 @@ impl std::fmt::Display for OutputFormat {
             OutputFormat::Preserve => write!(f, "preserve"),
             OutputFormat::Mp3 => write!(f, "mp3"),
             OutputFormat::Wav => write!(f, "wav"),
+            OutputFormat::Flac => write!(f, "flac"),
+            OutputFormat::Ogg => write!(f, "ogg"),
+            OutputFormat::Aac => write!(f, "aac"),
         }
     }
 }
