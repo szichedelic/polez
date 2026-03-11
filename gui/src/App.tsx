@@ -152,9 +152,7 @@ function App() {
             <DetectionPanel fileLoaded={!!fileInfo} />
           </ErrorBoundary>
           <ErrorBoundary section="Bit Plane">
-            <div className="hidden md:block">
-              <BitPlaneViewer fileLoaded={!!fileInfo} />
-            </div>
+            <BitPlaneViewer fileLoaded={!!fileInfo} />
           </ErrorBoundary>
         </div>
 
