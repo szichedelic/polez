@@ -153,8 +153,12 @@ export function TransportBar({ fileInfo, hasCleaned }: Props) {
         ref={containerRef}
         onClick={handleWaveformClick}
         className="cursor-pointer mb-3 rounded"
-        aria-label="Audio waveform — click to seek"
-        role="img"
+        aria-label="Audio position"
+        role="slider"
+        tabIndex={0}
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration)}
+        aria-valuenow={Math.round(currentTime)}
       />
 
       {/* Transport controls */}
