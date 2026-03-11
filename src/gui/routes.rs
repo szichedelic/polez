@@ -1670,4 +1670,48 @@ mod tests {
         // Without built frontend assets, this will be NOT_FOUND
         assert!(status == StatusCode::OK || status == StatusCode::NOT_FOUND);
     }
+
+    #[tokio::test]
+    async fn test_rate_limiter_enforces_limit_under_concurrency() {
+        let limiter = RateLimiter::new(5);
+        let tokens = limiter.tokens.clone();
+
+        // Spawn 20 concurrent tasks all trying to decrement
+        let mut handles = Vec::new();
+        for _ in 0..20 {
+            let t = tokens.clone();
+            handles.push(tokio::spawn(async move {
+                loop {
+                    let current = t.load(Ordering::Relaxed);
+                    if current == 0 {
+                        return false; // rejected
+                    }
+                    if t.compare_exchange_weak(
+                        current,
+                        current - 1,
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                    )
+                    .is_ok()
+                    {
+                        return true; // accepted
+                    }
+                }
+            }));
+        }
+
+        let mut accepted = 0;
+        for h in handles {
+            if h.await.unwrap() {
+                accepted += 1;
+            }
+        }
+
+        // Exactly 5 should be accepted (the initial token count)
+        assert_eq!(accepted, 5, "Expected exactly 5 accepted, got {accepted}");
+
+        // Token count must never wrap — should be 0, not u64::MAX
+        let final_val = tokens.load(Ordering::Relaxed);
+        assert_eq!(final_val, 0, "Tokens should be 0, got {final_val}");
+    }
 }
