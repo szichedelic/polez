@@ -164,17 +164,20 @@ impl WatermarkDetector {
         }
 
         if let Some(mr) = spatial_mr {
+            let method_name = if buffer.num_channels() >= 2 {
+                "spatial_encoding"
+            } else {
+                "spectral_insertion"
+            };
             if mr.detected {
                 result.detected.push(WatermarkDetection {
-                    method: "spatial_encoding".to_string(),
+                    method: method_name.to_string(),
                     confidence: mr.confidence,
                     description: mr.details.first().cloned().unwrap_or_default(),
                 });
                 result.watermark_count += 1;
             }
-            result
-                .method_results
-                .insert("spatial_encoding".to_string(), mr);
+            result.method_results.insert(method_name.to_string(), mr);
         }
 
         result.overall_confidence = if result.detected.is_empty() {
