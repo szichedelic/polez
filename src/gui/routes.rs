@@ -68,18 +68,24 @@ async fn rate_limit_middleware(
     request: axum::http::Request<axum::body::Body>,
     next: Next,
 ) -> Response {
-    // Atomically decrement; if previous value was already 0, reject.
-    // Wrapping subtract is safe: the refill task resets to max every second.
-    let prev = limiter.tokens.fetch_sub(1, Ordering::Relaxed);
-    if prev == 0 {
-        // Undo the subtract that would wrap around
-        limiter.tokens.fetch_add(1, Ordering::Relaxed);
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            [(header::RETRY_AFTER, "1")],
-            "Rate limit exceeded. Try again later.",
-        )
-            .into_response();
+    // Atomically decrement using compare-exchange loop to prevent underflow.
+    loop {
+        let current = limiter.tokens.load(Ordering::Relaxed);
+        if current == 0 {
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                [(header::RETRY_AFTER, "1")],
+                "Rate limit exceeded. Try again later.",
+            )
+                .into_response();
+        }
+        if limiter
+            .tokens
+            .compare_exchange_weak(current, current - 1, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            break;
+        }
     }
     next.run(request).await
 }
