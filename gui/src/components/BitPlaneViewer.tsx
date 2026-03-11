@@ -21,7 +21,7 @@ export function BitPlaneViewer({ fileLoaded }: Props) {
     <section className="bg-zinc-900 border border-zinc-700 rounded p-4" aria-label="Bit plane analysis">
       <div className="flex items-center justify-between mb-3">
         <span className="text-zinc-400 text-sm font-medium">BIT PLANES</span>
-        {loading && <span className="text-purple-400 text-xs" aria-live="polite">Loading...</span>}
+        {loading && <span className="text-zinc-400 text-xs" aria-live="polite">Loading...</span>}
       </div>
 
       {!data && !loading && (

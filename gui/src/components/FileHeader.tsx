@@ -71,7 +71,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
   if (fileInfo && !loading) {
     return (
       <nav className="flex flex-wrap items-center gap-2 sm:gap-4 bg-zinc-900 border-b border-zinc-700 px-4 py-3" aria-label="File information">
-        <span className="text-purple-400 font-bold text-lg tracking-wider">POLEZ</span>
+        <span className="text-zinc-200 font-bold text-lg tracking-wider">POLEZ</span>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-zinc-400 text-sm flex-1 min-w-0">
           <span className="text-zinc-200 font-medium truncate">{fileInfo.file_path.split('/').pop()}</span>
           <span>{fileInfo.format.toUpperCase()}</span>
@@ -107,11 +107,11 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
       aria-label="File upload area"
       className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-lg mx-4 my-4 py-12 transition-colors ${
         dragOver
-          ? 'border-purple-400 bg-purple-500/10'
+          ? 'border-zinc-500 bg-zinc-800/50'
           : 'border-zinc-600 bg-zinc-900 hover:border-zinc-500'
       }`}
     >
-      <div className="text-purple-400 font-bold text-2xl tracking-widest mb-2">POLEZ</div>
+      <div className="text-zinc-200 font-bold text-2xl tracking-widest mb-2">POLEZ</div>
       <div className="text-zinc-500 text-xs mb-4">Audio Forensics & Sanitization Engine</div>
       {loading ? (
         <div className="w-64 space-y-2">
@@ -120,7 +120,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
           </div>
           <div className="w-full bg-zinc-700 rounded-full h-2" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
             <div
-              className="bg-purple-500 h-2 rounded-full transition-all duration-200"
+              className="bg-zinc-400 h-2 rounded-full transition-all duration-200"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -133,7 +133,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
           <div className="text-zinc-500 text-xs">or</div>
           <button
             onClick={() => inputRef.current?.click()}
-            className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 sm:py-1.5 rounded text-sm font-medium min-h-[44px]"
+            className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-4 py-2.5 sm:py-1.5 rounded text-sm font-medium min-h-[44px]"
             aria-label="Choose audio file to upload"
           >
             Choose File

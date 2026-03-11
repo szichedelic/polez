@@ -59,7 +59,7 @@ export function DetectionPanel({ fileLoaded }: Props) {
             data-action="detect"
             onClick={() => runAnalysis('all')}
             disabled={!fileLoaded || !!loading}
-            className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
+            className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
             aria-label="Run all detection analyses"
           >
             {loading === 'all' ? 'Running...' : 'Run All'}

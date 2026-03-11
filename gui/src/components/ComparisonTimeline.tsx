@@ -39,8 +39,8 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
 
     const origWs = WaveSurfer.create({
       container: origRef.current,
-      waveColor: '#a855f7',
-      progressColor: '#7c3aed',
+      waveColor: '#a1a1aa',
+      progressColor: '#71717a',
       cursorColor: '#e4e4e7',
       barWidth: 2,
       barGap: 1,
@@ -150,7 +150,7 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
                     ? src === 'cleaned'
                       ? 'bg-emerald-700 text-emerald-100'
                       : src === 'original'
-                        ? 'bg-purple-700 text-purple-100'
+                        ? 'bg-zinc-600 text-zinc-100'
                         : 'bg-zinc-600 text-zinc-100'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
@@ -206,7 +206,7 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 rounded-full bg-purple-500" />
+              <div className="w-2 h-2 rounded-full bg-zinc-400" />
               <span className="text-xs text-zinc-400">Original</span>
             </div>
             <div
@@ -229,7 +229,7 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
         <div className="relative">
           <div className="flex items-center gap-4 mb-1">
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-purple-500" />
+              <div className="w-2 h-2 rounded-full bg-zinc-400" />
               <span className="text-xs text-zinc-400">Original</span>
             </div>
             <div className="flex items-center gap-1">

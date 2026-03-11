@@ -133,7 +133,7 @@ export function BatchPanel() {
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         className={`border border-dashed rounded p-4 mb-3 text-center transition-colors ${
-          dragOver ? 'border-purple-400 bg-purple-500/10' : 'border-zinc-700 hover:border-zinc-600'
+          dragOver ? 'border-zinc-500 bg-zinc-800/50' : 'border-zinc-700 hover:border-zinc-600'
         }`}
       >
         <div className="text-zinc-400 text-sm mb-1">
@@ -142,7 +142,7 @@ export function BatchPanel() {
         <button
           onClick={() => inputRef.current?.click()}
           disabled={processing}
-          className="text-purple-400 hover:text-purple-300 text-xs min-h-[44px] sm:min-h-0"
+          className="text-zinc-400 hover:text-zinc-300 text-xs min-h-[44px] sm:min-h-0"
         >
           or choose files
         </button>

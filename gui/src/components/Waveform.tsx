@@ -19,8 +19,8 @@ export function Waveform({ fileLoaded }: Props) {
 
     const ws = WaveSurfer.create({
       container: containerRef.current,
-      waveColor: '#a855f7',
-      progressColor: '#7c3aed',
+      waveColor: '#a1a1aa',
+      progressColor: '#71717a',
       cursorColor: '#e4e4e7',
       barWidth: 2,
       barGap: 1,

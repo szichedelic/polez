@@ -204,7 +204,7 @@ export function Spectrogram({ fileLoaded }: Props) {
               Reset zoom
             </button>
           )}
-          {loading && <span className="text-purple-400 text-xs" aria-live="polite">Loading...</span>}
+          {loading && <span className="text-zinc-400 text-xs" aria-live="polite">Loading...</span>}
           <span className="text-zinc-600 text-xs hidden sm:inline">Scroll to zoom, drag to pan</span>
         </div>
       </div>
