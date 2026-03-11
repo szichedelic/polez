@@ -107,7 +107,9 @@ function App() {
           <div
             className="bg-zinc-800 border border-zinc-600 rounded-lg p-6 max-w-sm"
             data-shortcuts-dialog
-            ref={(el) => el?.querySelector('button')?.focus()}
+            ref={useCallback((el: HTMLDivElement | null) => {
+              el?.querySelector<HTMLButtonElement>('button')?.focus();
+            }, [])}
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-zinc-100 font-bold text-lg mb-4">Keyboard Shortcuts</h2>
