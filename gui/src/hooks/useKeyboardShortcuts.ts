@@ -40,15 +40,17 @@ export function useKeyboardShortcuts(actions: ShortcutActions) {
       return;
     }
 
+    if (e.key.toLowerCase() === 'd' && !isInput && !(e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      actions.onDetect?.();
+      return;
+    }
+
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
       switch (e.key.toLowerCase()) {
         case 'u':
           e.preventDefault();
           actions.onUpload?.();
-          break;
-        case 'd':
-          e.preventDefault();
-          actions.onDetect?.();
           break;
         case 'enter':
           e.preventDefault();
@@ -72,7 +74,7 @@ export const SHORTCUT_LIST = [
   { keys: 'Space', description: 'Play / Pause audio' },
   { keys: '\u2190 / \u2192', description: 'Seek audio \u00B15 seconds' },
   { keys: 'Ctrl+U', description: 'Upload file' },
-  { keys: 'Ctrl+D', description: 'Run detection' },
+  { keys: 'D', description: 'Run detection' },
   { keys: 'Ctrl+Enter', description: 'Start cleaning' },
   { keys: 'Ctrl+S', description: 'Save cleaned file' },
   { keys: '?', description: 'Show keyboard shortcuts' },
