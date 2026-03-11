@@ -149,11 +149,7 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
                 aria-label={`Play ${src} audio`}
                 className={`px-2 py-1.5 sm:py-0.5 rounded text-xs capitalize min-h-[44px] sm:min-h-0 ${
                   activeSource === src
-                    ? src === 'cleaned'
-                      ? 'bg-emerald-700 text-emerald-100'
-                      : src === 'original'
-                        ? 'bg-zinc-600 text-zinc-100'
-                        : 'bg-zinc-600 text-zinc-100'
+                    ? 'bg-zinc-600 text-zinc-100'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >

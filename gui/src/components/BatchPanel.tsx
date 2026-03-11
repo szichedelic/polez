@@ -175,7 +175,7 @@ export function BatchPanel() {
               {f.downloadId && (
                 <a
                   href={getBatchDownloadUrl(f.downloadId)}
-                  className="text-blue-400 hover:text-blue-300"
+                  className="text-zinc-400 hover:text-zinc-300"
                   download
                 >
                   Download
