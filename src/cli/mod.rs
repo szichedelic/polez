@@ -47,7 +47,7 @@ Examples:
   polez clean track.wav --paranoid --paranoid-passes 5  Custom pass count
   polez clean track.wav --dry-run --report r.json  Analyze without cleaning
   polez clean track.mp3 -f wav                    Convert output to WAV format
-  polez clean track.wav --quality 75              Fine-grained quality control (0-100)
+  polez clean track.wav --quality 75              Mode shorthand (0-24=fast 25-49=standard 50-74=preserving 75+=aggressive)
   polez --json clean track.wav                   Machine-readable JSON output")]
     Clean {
         /// Input audio file path
@@ -65,7 +65,7 @@ Examples:
         #[arg(long, default_value = "2", value_parser = clap::value_parser!(u32).range(1..=10))]
         paranoid_passes: u32,
 
-        /// Quality slider 0-100 (alternative to config-based mode selection)
+        /// Cleaning mode as a numeric shorthand (0-100, maps to 4 discrete modes)
         /// 0-24=fast, 25-49=standard, 50-74=preserving, 75-100=aggressive
         #[arg(long, value_parser = clap::value_parser!(u32).range(0..=100))]
         quality: Option<u32>,
