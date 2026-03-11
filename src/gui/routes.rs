@@ -1210,6 +1210,13 @@ async fn batch_clean(
             format!("Multipart read error: {e}"),
         )
     })? {
+        if file_entries.len() >= MAX_BATCH_SIZE {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Batch size exceeds maximum of {MAX_BATCH_SIZE} files"),
+            ));
+        }
+
         let filename = field.file_name().unwrap_or("unknown").to_string();
         let ext = std::path::Path::new(&filename)
             .extension()
@@ -1260,13 +1267,6 @@ async fn batch_clean(
         })?;
 
         file_entries.push((filename, input_path.to_path_buf(), output_path));
-
-        if file_entries.len() > MAX_BATCH_SIZE {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!("Batch size exceeds maximum of {MAX_BATCH_SIZE} files"),
-            ));
-        }
     }
 
     // Phase 2: Process files with bounded concurrency
