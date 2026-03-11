@@ -1542,13 +1542,18 @@ fn cmd_config(action: Option<ConfigAction>, console: &ConsoleManager) -> error::
                 cli::QualityChoice::High => config::QualityLevel::High,
                 cli::QualityChoice::Maximum => config::QualityLevel::Maximum,
             };
+            if matches!(format, FormatChoice::Aac) {
+                return Err(error::PolezError::UnsupportedFormat(
+                    "AAC encoding is not supported; use wav, mp3, flac, or ogg".into(),
+                ));
+            }
             preset_config.output_format = match format {
                 FormatChoice::Preserve => config::OutputFormat::Preserve,
                 FormatChoice::Mp3 => config::OutputFormat::Mp3,
                 FormatChoice::Wav => config::OutputFormat::Wav,
                 FormatChoice::Flac => config::OutputFormat::Flac,
                 FormatChoice::Ogg => config::OutputFormat::Ogg,
-                FormatChoice::Aac => config::OutputFormat::Aac,
+                FormatChoice::Aac => unreachable!(),
             };
             preset_config.backup_originals = backup;
             preset_config.verification.auto_verify = verify;
