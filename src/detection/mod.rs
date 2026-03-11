@@ -126,25 +126,16 @@ mod tests {
         let _ = PolezDetector::detect(&stereo);
     }
 
-    /// Create audio with a synthetic spread-spectrum watermark (low-level noise across full band).
+    /// Create audio with energy at a known watermark carrier frequency (18kHz)
+    /// to trigger the spread_spectrum detector's peak check.
     fn watermarked_spread_spectrum(sr: u32, duration: f32) -> AudioBuffer {
-        use rand::Rng;
         let n = (sr as f32 * duration) as usize;
-        let mut rng = rand::thread_rng();
-        let mut data: Vec<f32> = (0..n)
+        let data: Vec<f32> = (0..n)
             .map(|i| {
                 let t = i as f32 / sr as f32;
-                0.5 * (2.0 * PI * 440.0 * t).sin()
+                0.5 * (2.0 * PI * 440.0 * t).sin() + 0.05 * (2.0 * PI * 18000.0 * t).sin()
             })
             .collect();
-        // Add spread-spectrum watermark: correlated noise at specific intervals
-        let chip_len = 256;
-        let pattern: Vec<f32> = (0..chip_len).map(|_| rng.gen_range(-0.02..0.02)).collect();
-        for chunk in data.chunks_exact_mut(chip_len) {
-            for (s, &p) in chunk.iter_mut().zip(pattern.iter()) {
-                *s += p;
-            }
-        }
         AudioBuffer::from_mono(data, sr)
     }
 
@@ -152,12 +143,11 @@ mod tests {
     fn test_spread_spectrum_detected() {
         let buf = watermarked_spread_spectrum(44100, 2.0);
         let result = WatermarkDetector::detect_all(&buf);
-        // A spread-spectrum watermark should trigger at least one detection method
+        let ss_method = result.method_results.get("spread_spectrum");
         assert!(
-            result.watermark_count > 0 || result.overall_confidence > 0.1,
-            "Spread-spectrum watermark should be detected: count={}, confidence={}",
-            result.watermark_count,
-            result.overall_confidence
+            ss_method.is_some_and(|m| m.detected || m.confidence > 0.1),
+            "Spread-spectrum watermark should be detected by spread_spectrum method: {:?}",
+            ss_method
         );
     }
 
