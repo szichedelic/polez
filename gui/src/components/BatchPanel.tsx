@@ -48,11 +48,16 @@ export function BatchPanel() {
       setFiles(prev => prev.map((f, i) => {
         const result = response.results[i];
         if (!result) return f;
+        // Look up download ID by result filename, falling back to the
+        // original file name in case the browser normalized the filename
+        // differently than the multipart library reports it.
+        const downloadId = response.download_ids[result.filename]
+          ?? response.download_ids[f.file.name];
         return {
           ...f,
           status: result.success ? 'done' as const : 'error' as const,
           result,
-          downloadId: response.download_ids[result.filename],
+          downloadId,
         };
       }));
     } catch (e: any) {
