@@ -2,12 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FileInfo } from './api/client';
 import { getSession, uploadFile } from './api/client';
 import { FileHeader } from './components/FileHeader';
-import { Waveform } from './components/Waveform';
+import { TransportBar } from './components/TransportBar';
 import { Spectrogram } from './components/Spectrogram';
 import { DetectionPanel } from './components/DetectionPanel';
 import { BitPlaneViewer } from './components/BitPlaneViewer';
 import { CleanPanel } from './components/CleanPanel';
-import { AudioPlayer } from './components/AudioPlayer';
 import { ComparisonTimeline } from './components/ComparisonTimeline';
 import { MetadataViewer } from './components/MetadataViewer';
 import { BatchPanel } from './components/BatchPanel';
@@ -156,12 +155,8 @@ function App() {
       </div>
 
       <main className="px-4 pb-4 space-y-4">
-        <ErrorBoundary section="Audio Player">
-          <AudioPlayer fileLoaded={!!fileInfo} hasCleaned={hasCleaned} />
-        </ErrorBoundary>
-
-        <ErrorBoundary section="Waveform">
-          <Waveform fileLoaded={!!fileInfo} />
+        <ErrorBoundary section="Audio Transport">
+          <TransportBar fileInfo={fileInfo} hasCleaned={hasCleaned} />
         </ErrorBoundary>
 
         <ErrorBoundary section="Spectrogram">
