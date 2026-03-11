@@ -98,16 +98,14 @@ fn write_audit_entry(entry: &AuditEntry, path: &Path) -> error::Result<()> {
     use std::io::Write;
     let json = serde_json::to_string(entry)
         .map_err(|e| error::PolezError::Other(anyhow::anyhow!("Audit serialization error: {e}")))?;
-    let is_new = !path.exists();
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.create(true).append(true);
     #[cfg(unix)]
-    if is_new {
-        use std::os::unix::fs::PermissionsExt;
-        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
     }
+    let mut file = opts.open(path)?;
     writeln!(file, "{json}")?;
     Ok(())
 }
