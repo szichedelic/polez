@@ -311,7 +311,8 @@ fn run_command(
             output,
             recursive,
             extension,
-        } => cmd_benchmark(&directory, &output, recursive, &extension, console),
+            labeled,
+        } => cmd_benchmark(&directory, &output, recursive, &extension, labeled, console),
         Commands::Inspect {
             input_file,
             output,
@@ -1049,6 +1050,7 @@ fn cmd_benchmark(
     output: &Path,
     recursive: bool,
     extensions: &[String],
+    labeled: bool,
     console: &ConsoleManager,
 ) -> error::Result<()> {
     use std::io::Write;
@@ -1056,7 +1058,7 @@ fn cmd_benchmark(
     console.info(&format!("Scanning directory: {}", directory.display()));
 
     let walker = walkdir::WalkDir::new(directory);
-    let walker = if recursive {
+    let walker = if recursive || labeled {
         walker
     } else {
         walker.max_depth(1)
@@ -1082,6 +1084,10 @@ fn cmd_benchmark(
     }
 
     console.success(&format!("Found {} files to analyze", files.len()));
+
+    if labeled {
+        return cmd_benchmark_labeled(directory, &files, output, console);
+    }
 
     let mut csv = std::fs::File::create(output)?;
     writeln!(
@@ -1113,6 +1119,158 @@ fn cmd_benchmark(
 
     console.success(&format!("Results written to: {}", output.display()));
     console.info("Open in Excel/Google Sheets to analyze the dataset");
+
+    Ok(())
+}
+
+/// Labeled benchmark: expects watermarked/ and clean/ subdirectories.
+/// Computes per-detector confusion matrix and accuracy metrics.
+fn cmd_benchmark_labeled(
+    base_dir: &Path,
+    files: &[PathBuf],
+    output: &Path,
+    console: &ConsoleManager,
+) -> error::Result<()> {
+    use std::io::Write;
+
+    // Classify files by label based on parent directory name
+    let mut labeled_files: Vec<(&Path, bool)> = Vec::new();
+    for file in files {
+        let is_watermarked = file.ancestors().any(|a| {
+            a.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.eq_ignore_ascii_case("watermarked"))
+                .unwrap_or(false)
+        });
+        let is_clean = file.ancestors().any(|a| {
+            a.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.eq_ignore_ascii_case("clean"))
+                .unwrap_or(false)
+        });
+        if is_watermarked {
+            labeled_files.push((file, true));
+        } else if is_clean {
+            labeled_files.push((file, false));
+        }
+    }
+
+    if labeled_files.is_empty() {
+        console.warning(&format!(
+            "No labeled files found. Expected watermarked/ and clean/ subdirectories under {}",
+            base_dir.display()
+        ));
+        return Ok(());
+    }
+
+    let watermarked_count = labeled_files.iter().filter(|(_, w)| *w).count();
+    let clean_count = labeled_files.len() - watermarked_count;
+    console.info(&format!(
+        "Labeled corpus: {} watermarked, {} clean",
+        watermarked_count, clean_count
+    ));
+
+    let method_names = detection::WatermarkDetector::METHOD_NAMES;
+
+    // Per-method confusion matrix: (TP, FP, TN, FN)
+    let mut method_stats: std::collections::HashMap<String, (usize, usize, usize, usize)> =
+        std::collections::HashMap::new();
+    for &name in method_names {
+        method_stats.insert(name.to_string(), (0, 0, 0, 0));
+    }
+
+    let pb = ui::progress::batch_progress(labeled_files.len() as u64);
+
+    for (file, is_watermarked) in &labeled_files {
+        let result = (|| -> error::Result<detection::WatermarkResult> {
+            let (buf, _) = audio::load_audio(file)?;
+            Ok(detection::WatermarkDetector::detect_all(&buf))
+        })();
+
+        if let Ok(wr) = result {
+            for &name in method_names {
+                let detected = wr
+                    .method_results
+                    .get(name)
+                    .map(|mr| mr.detected)
+                    .unwrap_or(false);
+                let stats = method_stats.get_mut(name).unwrap();
+                match (detected, *is_watermarked) {
+                    (true, true) => stats.0 += 1,   // TP
+                    (true, false) => stats.1 += 1,  // FP
+                    (false, false) => stats.2 += 1, // TN
+                    (false, true) => stats.3 += 1,  // FN
+                }
+            }
+        }
+
+        pb.inc(1);
+    }
+
+    pb.finish_and_clear();
+
+    // Write CSV report
+    let mut csv = std::fs::File::create(output)?;
+    writeln!(
+        csv,
+        "method,reliability,TP,FP,TN,FN,precision,recall,F1,FPR"
+    )?;
+
+    // Print table to console
+    console.info("");
+    console.info(&format!(
+        "{:<24} {:<14} {:>4} {:>4} {:>4} {:>4} {:>9} {:>9} {:>9} {:>9}",
+        "METHOD", "RELIABILITY", "TP", "FP", "TN", "FN", "PREC", "RECALL", "F1", "FPR"
+    ));
+    console.info(&"-".repeat(104));
+
+    for &name in method_names {
+        let (tp, fp, tn, fn_) = method_stats[name];
+        let reliability = detection::watermark::method_reliability(name);
+        let precision = if tp + fp > 0 {
+            tp as f64 / (tp + fp) as f64
+        } else {
+            0.0
+        };
+        let recall = if tp + fn_ > 0 {
+            tp as f64 / (tp + fn_) as f64
+        } else {
+            0.0
+        };
+        let f1 = if precision + recall > 0.0 {
+            2.0 * precision * recall / (precision + recall)
+        } else {
+            0.0
+        };
+        let fpr = if fp + tn > 0 {
+            fp as f64 / (fp + tn) as f64
+        } else {
+            0.0
+        };
+
+        writeln!(
+            csv,
+            "{},{},{},{},{},{},{:.3},{:.3},{:.3},{:.3}",
+            name, reliability, tp, fp, tn, fn_, precision, recall, f1, fpr
+        )?;
+
+        console.info(&format!(
+            "{:<24} {:<14} {:>4} {:>4} {:>4} {:>4} {:>9.3} {:>9.3} {:>9.3} {:>9.3}",
+            name,
+            reliability.label(),
+            tp,
+            fp,
+            tn,
+            fn_,
+            precision,
+            recall,
+            f1,
+            fpr
+        ));
+    }
+
+    console.info("");
+    console.success(&format!("Results written to: {}", output.display()));
 
     Ok(())
 }

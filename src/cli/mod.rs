@@ -204,7 +204,8 @@ Examples:
 Examples:
   polez benchmark ./dataset                     Scan directory, output CSV
   polez benchmark ./dataset -o results.csv -r   Recursive scan with custom output
-  polez benchmark ./dataset -e wav -e flac      Scan only WAV and FLAC files")]
+  polez benchmark ./dataset -e wav -e flac      Scan only WAV and FLAC files
+  polez benchmark ./corpus --labeled             Corpus with watermarked/ and clean/ subdirs")]
     Benchmark {
         /// Directory containing audio files
         directory: PathBuf,
@@ -220,6 +221,11 @@ Examples:
         /// File extensions to process
         #[arg(short, long, default_values = ["mp3", "wav", "flac", "aac", "m4a"])]
         extension: Vec<String>,
+
+        /// Enable labeled corpus mode: expects watermarked/ and clean/ subdirectories.
+        /// Produces per-detector confusion matrix and accuracy metrics.
+        #[arg(long)]
+        labeled: bool,
     },
 
     /// Visualize high-frequency spectrogram to reveal watermarks
