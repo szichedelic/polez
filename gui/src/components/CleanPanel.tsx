@@ -19,7 +19,7 @@ function ConfidenceBar({ label, value, max = 1 }: { label: string; value: number
         <span className="text-zinc-300">{indicator ? `${indicator} ${label}` : label}</span>
         <span className="text-zinc-400">{pct.toFixed(1)}%</span>
       </div>
-      <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
+      <div className="h-2 bg-zinc-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${label}: ${pct.toFixed(1)}%`}>
         <div className={`h-full ${bg} rounded-full`} style={{ width: `${pct}%` }} />
       </div>
     </div>
