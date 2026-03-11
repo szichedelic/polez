@@ -1191,6 +1191,8 @@ async fn batch_clean(
         other => return Err((StatusCode::BAD_REQUEST, format!("Unknown mode: {other}"))),
     };
 
+    const MAX_BATCH_SIZE: usize = 50;
+
     // Phase 1: Read all multipart fields sequentially (stream constraint)
     let mut file_entries: Vec<(String, std::path::PathBuf, std::path::PathBuf)> = Vec::new();
 
@@ -1250,17 +1252,31 @@ async fn batch_clean(
         })?;
 
         file_entries.push((filename, input_path.to_path_buf(), output_path));
+
+        if file_entries.len() > MAX_BATCH_SIZE {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Batch size exceeds maximum of {MAX_BATCH_SIZE} files"),
+            ));
+        }
     }
 
-    // Phase 2: Process all files concurrently
+    // Phase 2: Process files with bounded concurrency
+    let max_concurrency = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(max_concurrency));
+
     let mut tasks = Vec::new();
     for (filename, input_path, output_path) in file_entries {
         let out_buf = output_path.clone();
         let input_buf = input_path.clone();
         let file_mode = mode;
         let st = state.clone();
+        let sem = semaphore.clone();
 
         tasks.push(tokio::spawn(async move {
+            let _permit = sem.acquire().await.expect("semaphore closed");
             let result = tokio::task::spawn_blocking(move || {
                 let cfg = default_config();
                 let flags = AdvancedFlags::default();
