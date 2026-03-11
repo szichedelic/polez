@@ -1254,7 +1254,7 @@ fn detect_spatial_encoding(buffer: &AudioBuffer) -> MethodResult {
             }
         }
     } else {
-        // Mono: check for narrowband spectral insertions (spatial encoding markers)
+        // Mono fallback: detect narrowband spectral insertions (not spatial encoding)
         let channel: Vec<f32> = buffer.channel(0).to_vec();
         let sr = buffer.sample_rate;
 
@@ -1305,7 +1305,7 @@ fn detect_spatial_encoding(buffer: &AudioBuffer) -> MethodResult {
             let conf = (narrow_peaks as f64 * 0.12).min(0.85);
             max_confidence = max_confidence.max(conf);
             result.details.push(format!(
-                "Narrowband spectral insertions: {narrow_peaks} suspicious peaks"
+                "Narrowband spectral insertions (mono fallback): {narrow_peaks} suspicious peaks"
             ));
         }
     }
