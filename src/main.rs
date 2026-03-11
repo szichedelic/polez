@@ -1152,7 +1152,7 @@ fn display_polez_results(result: &detection::PolezDetectionResult, _console: &Co
     );
     println!(
         "{}",
-        "║  POLEZ AI WATERMARK DETECTION                                                    ║"
+        "║  POLEZ AI WATERMARK DETECTION (EXPERIMENTAL — NOT VALIDATED)                       ║"
             .magenta()
     );
     println!(

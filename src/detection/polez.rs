@@ -1,18 +1,26 @@
-//! AI watermark detection based on empirical analysis.
+//! EXPERIMENTAL AI watermark detection — NOT validated against real data.
+//!
+//! This detector uses heuristic signals that have NOT been calibrated against
+//! known AI-watermarked audio (Suno, Udio, MusicGen, etc.).  Results should be
+//! treated as speculative and may have high false-positive rates on normal audio.
 //!
 //! Detection signals:
-//! 1. Ultrasonic energy (23-24 kHz) - Target watermark embedded in high frequencies
-//! 2. Bit plane bias - All 8 bit planes skewed below 50%
-//! 3. Autocorrelation - Periodic patterns from spread-spectrum encoding
+//! 1. Ultrasonic energy ratio (near-Nyquist vs reference band)
+//! 2. Bit plane bias across 8 LSB planes
+//! 3. LSB autocorrelation at fixed periods
 
 use serde::Serialize;
 
 use crate::audio::AudioBuffer;
 
-/// Result of AI watermark analysis.
+/// Result of EXPERIMENTAL AI watermark analysis.
+///
+/// These results have not been validated against real AI-watermarked audio and
+/// may produce false positives on normal audio.
 #[derive(Debug, Clone, Serialize)]
 pub struct PolezDetectionResult {
-    /// Overall probability this is AI-generated (0.0 - 1.0)
+    /// Overall probability this is AI-generated (0.0 - 1.0).
+    /// NOT calibrated — treat as a heuristic score, not a true probability.
     pub detection_probability: f64,
     /// Confidence in the detection (0.0 - 1.0)
     pub confidence: f64,
@@ -20,6 +28,8 @@ pub struct PolezDetectionResult {
     pub signals: PolezSignals,
     /// Human-readable verdict
     pub verdict: &'static str,
+    /// Whether this detector has been validated against real data.
+    pub validated: bool,
 }
 
 /// Individual detection signals.
@@ -81,11 +91,16 @@ impl PolezDetector {
         let detection_probability = Self::calibrate_probability(raw_probability);
 
         let verdict = match (detection_probability, confidence) {
-            (p, c) if p > 0.8 && c > 0.6 => "AI WATERMARK DETECTED - High confidence",
-            (p, _) if p > 0.7 => "LIKELY AI WATERMARK - Watermark signatures present",
-            (p, _) if p > 0.5 => "POSSIBLY AI WATERMARK - Some signatures detected",
-            (p, _) if p > 0.3 => "UNLIKELY AI WATERMARK - Few signatures",
-            _ => "NO AI WATERMARK - No watermark signatures",
+            (p, c) if p > 0.8 && c > 0.6 => {
+                "EXPERIMENTAL: Heuristic signals elevated — unvalidated, may be false positive"
+            }
+            (p, _) if p > 0.7 => {
+                "EXPERIMENTAL: Some heuristic signals present — unvalidated, treat with caution"
+            }
+            (p, _) if p > 0.5 => {
+                "EXPERIMENTAL: Weak heuristic signals — likely normal audio characteristics"
+            }
+            _ => "No heuristic signals detected",
         };
 
         PolezDetectionResult {
@@ -102,6 +117,7 @@ impl PolezDetector {
                 autocorr_score,
             },
             verdict,
+            validated: false,
         }
     }
 
