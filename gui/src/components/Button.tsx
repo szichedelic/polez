@@ -16,7 +16,7 @@ const variants: Record<ButtonVariant, string> = {
   secondary:
     'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-700 disabled:cursor-not-allowed',
   ghost:
-    'bg-transparent border border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400 disabled:border-zinc-900 disabled:text-zinc-700 disabled:cursor-not-allowed',
+    'bg-transparent border border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400 disabled:bg-transparent disabled:border-zinc-900 disabled:text-zinc-700 disabled:cursor-not-allowed',
 };
 
 export function Button({ variant = 'secondary', className, children, ...props }: Props) {
