@@ -191,6 +191,7 @@ export function BatchPanel() {
                 <button
                   onClick={() => removeFile(i)}
                   className="text-zinc-500 hover:text-zinc-300"
+                  aria-label={`Remove ${f.file.name}`}
                 >
                   {'\u2717'}
                 </button>
