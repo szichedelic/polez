@@ -249,9 +249,13 @@ async fn load_file(
         channels: buffer.num_channels(),
     };
 
+    let log_filename = std::path::Path::new(&req.path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("<unknown>");
     tracing::info!(
         action = "load_file",
-        path = %req.path,
+        file = %log_filename,
         format = %info.format,
         duration_secs = info.duration_secs,
         sample_rate = info.sample_rate,
@@ -988,9 +992,13 @@ async fn clean_file(
         s.cleaned_format = Some(cleaned_fmt.to_string());
     }
 
+    let clean_log_filename = std::path::Path::new(&file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("<unknown>");
     tracing::info!(
         action = "clean_file",
-        source = %file_path,
+        file = %clean_log_filename,
         mode = %req.mode.as_deref().unwrap_or("standard"),
         success = san_result.success,
         quality_loss = san_result.quality_loss,
