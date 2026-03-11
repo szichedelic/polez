@@ -937,7 +937,7 @@ fn cmd_detect(
         Some(detection::PolezDetector::detect(&audio_buf))
     };
 
-    let stat_result = if deep && !is_filtered {
+    let stat_result = if deep {
         Some(StatisticalAnalyzer::analyze(&audio_buf))
     } else {
         None
