@@ -67,12 +67,17 @@ export function TransportBar({ fileInfo, hasCleaned }: Props) {
     };
   }, [fileInfo]);
 
-  // Update waveform progress from audio element
+  // Update waveform progress from audio element (throttled to rAF)
+  const rafRef = useRef<number>(0);
   useEffect(() => {
     const ws = wsRef.current;
     if (!ws || duration <= 0) return;
-    const progress = currentTime / duration;
-    ws.seekTo(Math.min(1, Math.max(0, progress)));
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      const progress = currentTime / duration;
+      ws.seekTo(Math.min(1, Math.max(0, progress)));
+    });
+    return () => cancelAnimationFrame(rafRef.current);
   }, [currentTime, duration]);
 
   // Source switching
