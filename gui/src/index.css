@@ -1,6 +1,31 @@
 @import "tailwindcss";
 @source "../safelist.txt";
 
+@layer base {
+  :root {
+    /* Zinc neutral palette (UI chrome) */
+    --bg-page: #09090b;
+    --bg-card: #18181b;
+    --border: #27272a;
+    --border-active: #3f3f46;
+    --text-muted: #52525b;
+    --text-secondary: #a1a1aa;
+    --text-primary: #e4e4e7;
+    --text-emphasis: #fafafa;
+
+    /* Data-only accent colors */
+    --data-threat: #f43f5e;
+    --data-warning: #f59e0b;
+    --data-clean: #10b981;
+    --data-waveform: #a1a1aa;
+
+    /* Surface tokens */
+    --radius: 6px;
+    --border-width: 1px;
+    --active-accent: 2px;
+  }
+}
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
