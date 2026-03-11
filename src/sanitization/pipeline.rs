@@ -497,10 +497,10 @@ mod tests {
         let (cleaned, _) = process_with_normalization(&buf, SanitizationMode::Standard);
         let after = detect_confidence(&cleaned);
 
-        // Standard mode should at least not make things significantly worse
+        // Standard mode should reduce or maintain watermark confidence
         assert!(
-            after <= before + 0.3,
-            "Standard mode made watermarks much worse: before={before}, after={after}"
+            after <= before + 0.05,
+            "Standard mode made watermarks worse: before={before}, after={after}"
         );
     }
 
