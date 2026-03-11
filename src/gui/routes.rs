@@ -1302,7 +1302,6 @@ async fn batch_clean(
     }
 
     let mut results = Vec::new();
-    let mut download_ids = std::collections::HashMap::new();
 
     for task in tasks {
         let (filename, input_path, output_path, result, st) = task.await.map_err(|e| {
@@ -1327,7 +1326,6 @@ async fn batch_clean(
                     s.temp_paths.push(output_path.clone());
                     s.temp_paths.push(input_path);
                 }
-                download_ids.insert(filename.clone(), id.clone());
                 if let Ok(mut map) = BATCH_DOWNLOADS.lock() {
                     purge_stale_downloads(&mut map);
                     map.insert(id.clone(), (output_path, std::time::Instant::now()));
@@ -1364,10 +1362,7 @@ async fn batch_clean(
         mode = %query.mode.as_deref().unwrap_or("standard"),
     );
 
-    Ok(Json(BatchCleanResponse {
-        results,
-        download_ids,
-    }))
+    Ok(Json(BatchCleanResponse { results }))
 }
 
 static BATCH_DOWNLOADS: std::sync::LazyLock<

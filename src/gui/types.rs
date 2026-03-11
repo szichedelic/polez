@@ -1,7 +1,6 @@
 //! Request and response types for the GUI REST API.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use crate::detection::{
     metadata_scan::MetadataScanResult, polez::PolezDetectionResult, statistical::StatisticalResult,
@@ -237,6 +236,4 @@ pub struct BatchFileResult {
 pub struct BatchCleanResponse {
     /// Per-file processing results.
     pub results: Vec<BatchFileResult>,
-    /// Map of filename to download ID for retrieving cleaned files.
-    pub download_ids: HashMap<String, String>,
 }

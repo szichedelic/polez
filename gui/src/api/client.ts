@@ -312,7 +312,6 @@ export interface BatchFileResult {
 
 export interface BatchCleanResponse {
   results: BatchFileResult[];
-  download_ids: Record<string, string>;
 }
 
 export async function batchClean(files: File[], mode: string): Promise<BatchCleanResponse> {
