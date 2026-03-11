@@ -70,12 +70,14 @@ export function useKeyboardShortcuts(actions: ShortcutActions) {
   }, [handler]);
 }
 
+const mod = typeof navigator !== 'undefined' && /Macintosh|Mac OS|iPhone|iPad/.test(navigator.userAgent) ? '\u2318' : 'Ctrl';
+
 export const SHORTCUT_LIST = [
   { keys: 'Space', description: 'Play / Pause audio' },
   { keys: '\u2190 / \u2192', description: 'Seek audio \u00B15 seconds' },
-  { keys: 'Ctrl+U', description: 'Upload file' },
+  { keys: `${mod}+U`, description: 'Upload file' },
   { keys: 'D', description: 'Run detection' },
-  { keys: 'Ctrl+Enter', description: 'Start cleaning' },
-  { keys: 'Ctrl+S', description: 'Save cleaned file' },
+  { keys: `${mod}+Enter`, description: 'Start cleaning' },
+  { keys: `${mod}+S`, description: 'Save cleaned file' },
   { keys: '?', description: 'Show keyboard shortcuts' },
 ];
