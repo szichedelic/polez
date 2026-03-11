@@ -1696,45 +1696,41 @@ mod tests {
 
     #[tokio::test]
     async fn test_rate_limiter_enforces_limit_under_concurrency() {
+        // Build a router with only 5 tokens to exercise the actual middleware
+        let state = test_state();
         let limiter = RateLimiter::new(5);
-        let tokens = limiter.tokens.clone();
+        let app = Router::new()
+            .route("/api/health", get(health))
+            .route_layer(middleware::from_fn_with_state(
+                limiter,
+                rate_limit_middleware,
+            ))
+            .with_state(state);
 
-        // Spawn 20 concurrent tasks all trying to decrement
+        // Send 20 concurrent requests through the real middleware
         let mut handles = Vec::new();
         for _ in 0..20 {
-            let t = tokens.clone();
+            let router = app.clone();
             handles.push(tokio::spawn(async move {
-                loop {
-                    let current = t.load(Ordering::Relaxed);
-                    if current == 0 {
-                        return false; // rejected
-                    }
-                    if t.compare_exchange_weak(
-                        current,
-                        current - 1,
-                        Ordering::Relaxed,
-                        Ordering::Relaxed,
-                    )
-                    .is_ok()
-                    {
-                        return true; // accepted
-                    }
-                }
+                let req = axum::http::Request::builder()
+                    .uri("/api/health")
+                    .body(Body::empty())
+                    .unwrap();
+                router.oneshot(req).await.unwrap().status()
             }));
         }
 
         let mut accepted = 0;
+        let mut rejected = 0;
         for h in handles {
-            if h.await.unwrap() {
-                accepted += 1;
+            match h.await.unwrap() {
+                StatusCode::OK => accepted += 1,
+                StatusCode::TOO_MANY_REQUESTS => rejected += 1,
+                other => panic!("Unexpected status: {other}"),
             }
         }
 
-        // Exactly 5 should be accepted (the initial token count)
         assert_eq!(accepted, 5, "Expected exactly 5 accepted, got {accepted}");
-
-        // Token count must never wrap — should be 0, not u64::MAX
-        let final_val = tokens.load(Ordering::Relaxed);
-        assert_eq!(final_val, 0, "Tokens should be 0, got {final_val}");
+        assert_eq!(rejected, 15, "Expected exactly 15 rejected, got {rejected}");
     }
 }
