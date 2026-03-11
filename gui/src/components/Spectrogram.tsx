@@ -25,8 +25,22 @@ function buildViridisLUT(): Uint8Array {
 
 const VIRIDIS = buildViridisLUT();
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DetectionResults = Record<string, any>;
+
+interface Annotation {
+  type: 'freq-band' | 'time-region';
+  label: string;
+  freqMin?: number;
+  freqMax?: number;
+  timeStart?: number;
+  timeEnd?: number;
+  confidence: number;
+}
+
 interface Props {
   fileLoaded: boolean;
+  detectionResults?: DetectionResults | null;
 }
 
 interface ViewRange {
@@ -43,7 +57,60 @@ const DEFAULT_VIEW: ViewRange = {
   duration: 0,
 };
 
-export function Spectrogram({ fileLoaded }: Props) {
+function extractAnnotations(results: DetectionResults | null | undefined): Annotation[] {
+  if (!results) return [];
+  const annotations: Annotation[] = [];
+
+  // Parse watermark results for frequency info
+  const wm = results.watermark;
+  if (wm?.method_results) {
+    // frequency_domain detections — look for "Suspicious energy at XXXXX Hz"
+    const fd = wm.method_results.frequency_domain;
+    if (fd?.detected && fd.details) {
+      for (const detail of fd.details) {
+        const match = detail.match(/(\d+)\s*Hz/i);
+        if (match) {
+          const freq = parseInt(match[1], 10);
+          annotations.push({
+            type: 'freq-band',
+            label: `${(freq / 1000).toFixed(0)}kHz watermark`,
+            freqMin: freq - 500,
+            freqMax: freq + 500,
+            confidence: fd.confidence,
+          });
+        }
+      }
+    }
+
+    // Spread spectrum — full-band indicator
+    const ss = wm.method_results.spread_spectrum;
+    if (ss?.detected) {
+      annotations.push({
+        type: 'freq-band',
+        label: 'Spread spectrum',
+        freqMin: 15000,
+        freqMax: 22000,
+        confidence: ss.confidence,
+      });
+    }
+
+    // Phase modulation — typically broadband
+    const pm = wm.method_results.phase_modulation;
+    if (pm?.detected) {
+      annotations.push({
+        type: 'freq-band',
+        label: 'Phase modulation',
+        freqMin: 0,
+        freqMax: 24000,
+        confidence: pm.confidence,
+      });
+    }
+  }
+
+  return annotations;
+}
+
+export function Spectrogram({ fileLoaded, detectionResults }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<SpectrogramData | null>(null);
@@ -351,6 +418,9 @@ export function Spectrogram({ fileLoaded }: Props) {
   const minimapLeft = fullDuration > 0 ? (view.timeStart / fullDuration) * 100 : 0;
   const minimapWidth = fullDuration > 0 ? (currentTimeRange / fullDuration) * 100 : 100;
 
+  // Detection annotations
+  const annotations = extractAnnotations(detectionResults);
+
   // Frequency axis ticks
   const freqTicks = [0, 2000, 4000, 8000, 12000, 16000, 20000, 24000]
     .filter(f => f >= view.freqMin && f <= view.freqMax)
@@ -443,6 +513,33 @@ export function Spectrogram({ fileLoaded }: Props) {
               aria-label="Spectrogram frequency visualization"
               role="img"
             />
+            {/* Detection annotations */}
+            {annotations.map((ann, i) => {
+              if (ann.type === 'freq-band' && ann.freqMin != null && ann.freqMax != null) {
+                const freqRange = view.freqMax - view.freqMin;
+                if (freqRange <= 0) return null;
+                const topPct = ((view.freqMax - ann.freqMax) / freqRange) * 100;
+                const bottomPct = ((view.freqMax - ann.freqMin) / freqRange) * 100;
+                const heightPct = bottomPct - topPct;
+                if (topPct > 100 || bottomPct < 0) return null;
+                return (
+                  <div
+                    key={i}
+                    className="absolute left-0 right-0 pointer-events-none border-y border-rose-500/40"
+                    style={{
+                      top: `${Math.max(0, topPct)}%`,
+                      height: `${Math.min(100, heightPct)}%`,
+                      background: `rgba(244, 63, 94, ${0.08 + ann.confidence * 0.12})`,
+                    }}
+                  >
+                    <span className="absolute top-0 left-1 text-[0.55rem] font-data text-rose-400/80">
+                      {ann.label}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })}
             {/* Crosshair + tooltip */}
             {cursor && !dragging && (
               <>

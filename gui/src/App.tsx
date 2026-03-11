@@ -14,9 +14,13 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { useKeyboardShortcuts, SHORTCUT_LIST } from './hooks/useKeyboardShortcuts';
 import { useColorblind } from './hooks/useColorblind';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type DetectionResults = Record<string, any>;
+
 function App() {
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [hasCleaned, setHasCleaned] = useState(false);
+  const [detectionResults, setDetectionResults] = useState<DetectionResults | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const { enabled: colorblindMode, toggle: toggleColorblind } = useColorblind();
@@ -33,6 +37,7 @@ function App() {
   const handleFileLoaded = (info: FileInfo) => {
     setFileInfo(info);
     setHasCleaned(false);
+    setDetectionResults(null);
   };
 
   const togglePlay = useCallback(() => {
@@ -160,12 +165,12 @@ function App() {
         </ErrorBoundary>
 
         <ErrorBoundary section="Spectrogram">
-          <Spectrogram fileLoaded={!!fileInfo} />
+          <Spectrogram fileLoaded={!!fileInfo} detectionResults={detectionResults} />
         </ErrorBoundary>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ErrorBoundary section="Detection">
-            <DetectionPanel fileLoaded={!!fileInfo} />
+            <DetectionPanel fileLoaded={!!fileInfo} onResults={setDetectionResults} />
           </ErrorBoundary>
           <ErrorBoundary section="Bit Plane">
             <BitPlaneViewer fileLoaded={!!fileInfo} />

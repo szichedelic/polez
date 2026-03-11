@@ -6,6 +6,7 @@ import { Button } from './Button';
 
 interface Props {
   fileLoaded: boolean;
+  onResults?: (results: Record<string, any>) => void;
 }
 
 function ConfidenceBar({ label, value, max = 1 }: { label: string; value: number; max?: number }) {
@@ -29,7 +30,7 @@ function ConfidenceBar({ label, value, max = 1 }: { label: string; value: number
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnalysisResults = Record<string, any>;
 
-export function DetectionPanel({ fileLoaded }: Props) {
+export function DetectionPanel({ fileLoaded, onResults }: Props) {
   const { palette } = useColorblind();
   const [results, setResults] = useState<AnalysisResults | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
@@ -46,7 +47,11 @@ export function DetectionPanel({ fileLoaded }: Props) {
         case 'metadata': result = { metadata: await analyzeMetadata() }; break;
         default: return;
       }
-      setResults((prev) => ({ ...prev, ...result }));
+      setResults((prev) => {
+        const merged = { ...prev, ...result };
+        onResults?.(merged);
+        return merged;
+      });
     } finally {
       setLoading(null);
     }
