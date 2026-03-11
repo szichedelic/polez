@@ -197,8 +197,8 @@ mod tests {
             .map(|i| {
                 let t = i as f32 / sr as f32;
                 0.5 * (2.0 * PI * 440.0 * t).sin()
-                    + 0.03 * (2.0 * PI * 21000.0 * t).sin()
-                    + 0.03 * (2.0 * PI * 21500.0 * t).sin()
+                    + 0.03 * (2.0 * PI * 23000.0 * t).sin()
+                    + 0.03 * (2.0 * PI * 23500.0 * t).sin()
             })
             .collect();
         AudioBuffer::from_mono(data, sr)
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_ultrasonic_watermark_detected() {
-        // Use 48kHz to ensure ultrasonic bands are representable
+        // Use 48kHz; detector examines 23-24kHz band at this sample rate
         let buf = watermarked_ultrasonic(48000, 2.0);
         let result = PolezDetector::detect(&buf);
         assert!(
