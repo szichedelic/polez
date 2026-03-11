@@ -14,6 +14,8 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const FORMATS = ['WAV', 'MP3', 'FLAC', 'OGG'];
+
 export function FileHeader({ fileInfo, onFileLoaded }: Props) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -69,24 +71,26 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  // ── Loaded state: compact horizontal bar ──
   if (fileInfo && !loading) {
     return (
-      <nav className="flex flex-wrap items-center gap-2 sm:gap-4 bg-zinc-900 border-b border-zinc-700 px-4 py-3" aria-label="File information">
-        <span className="font-heading text-zinc-200 font-semibold text-lg tracking-tight">POLEZ</span>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-zinc-400 text-sm flex-1 min-w-0">
-          <span className="text-zinc-200 font-medium truncate">{fileInfo.file_path.split('/').pop()}</span>
-          <span className="font-data">{fileInfo.format.toUpperCase()}</span>
-          <span className="font-data">{fileInfo.sample_rate / 1000}kHz</span>
-          <span className="font-data">{fileInfo.channels}ch</span>
-          <span className="font-data">{formatDuration(fileInfo.duration_secs)}</span>
+      <nav
+        className="flex flex-wrap items-center gap-3 sm:gap-4 bg-zinc-900 border-b border-zinc-800 px-4 py-2.5"
+        aria-label="File information"
+      >
+        <span className="font-heading text-zinc-50 font-semibold text-sm tracking-tight">POLEZ</span>
+        <div className="w-px h-4 bg-zinc-800 hidden sm:block" />
+        <span className="text-zinc-200 text-sm font-medium truncate min-w-0">{fileInfo.file_path.split('/').pop()}</span>
+        <div className="flex items-center gap-3 text-zinc-500 text-xs font-data ml-auto">
+          <span>{fileInfo.format.toUpperCase()}</span>
+          <span>{fileInfo.sample_rate / 1000}kHz</span>
+          <span>{fileInfo.channels}ch</span>
+          <span>{formatDuration(fileInfo.duration_secs)}</span>
+          <span>{formatBytes(fileInfo.duration_secs * fileInfo.sample_rate * fileInfo.channels * 2)}</span>
         </div>
-        <button
-          onClick={() => inputRef.current?.click()}
-          className="text-zinc-400 hover:text-zinc-200 text-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label="Change audio file"
-        >
-          Change file
-        </button>
+        <Button variant="ghost" onClick={() => inputRef.current?.click()} aria-label="Change audio file">
+          Change
+        </Button>
         <input
           ref={inputRef}
           type="file"
@@ -99,6 +103,7 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
     );
   }
 
+  // ── Empty state: branded upload hero ──
   return (
     <div
       onDrop={handleDrop}
@@ -106,49 +111,61 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
       onDragLeave={handleDragLeave}
       role="region"
       aria-label="File upload area"
-      className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-lg mx-4 my-4 py-12 transition-colors ${
-        dragOver
-          ? 'border-zinc-600 bg-zinc-900/50'
-          : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
-      }`}
+      className="flex flex-col items-center justify-center bg-zinc-950 px-4 py-16"
     >
-      <div className="font-heading text-zinc-200 font-semibold text-2xl tracking-tight mb-2">POLEZ</div>
-      <div className="text-zinc-500 text-xs mb-4">Audio Forensics & Sanitization Engine</div>
+      <h1 className="font-heading text-zinc-50 font-semibold text-3xl tracking-tight">POLEZ</h1>
+      <p className="text-zinc-600 text-sm mt-1 mb-8">Audio Forensics & Sanitization</p>
+
       {loading ? (
         <div className="w-64 space-y-2">
-          <div className="text-zinc-400 text-sm text-center">
+          <div className="text-zinc-400 text-sm text-center font-data">
             Uploading... {progress}%
           </div>
-          <div className="w-full bg-zinc-700 rounded-full h-2" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
+          <div className="w-full bg-zinc-800 rounded-full h-1.5" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
             <div
-              className="bg-zinc-400 h-2 rounded-full transition-all duration-200"
+              className="bg-zinc-400 h-1.5 rounded-full transition-all duration-200"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
       ) : (
-        <>
-          <div className="text-zinc-400 text-sm">
-            Drag & drop an audio file here
+        <div
+          className={`flex flex-col items-center gap-4 border border-dashed rounded-[6px] px-12 py-8 transition-colors cursor-pointer ${
+            dragOver
+              ? 'border-solid border-zinc-700 bg-zinc-900/30'
+              : 'border-zinc-800 hover:border-zinc-700'
+          }`}
+          onClick={() => inputRef.current?.click()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
+          tabIndex={0}
+          role="button"
+          aria-label="Drop audio file or click to browse"
+        >
+          <p className="text-zinc-500 text-sm">Drop audio file or click to browse</p>
+          <div className="flex gap-2">
+            {FORMATS.map((fmt) => (
+              <span
+                key={fmt}
+                className="font-data text-zinc-600 text-[0.65rem] bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5"
+              >
+                {fmt}
+              </span>
+            ))}
           </div>
-          <div className="text-zinc-500 text-xs">or</div>
-          <Button variant="primary" onClick={() => inputRef.current?.click()} aria-label="Choose audio file to upload">
-            Choose File
-          </Button>
-          <div className="text-zinc-600 text-xs mt-1">
-            Max {formatBytes(MAX_UPLOAD_BYTES)}
-          </div>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="audio/*"
-            onChange={handlePickerChange}
-            className="hidden"
-            aria-label="Choose audio file"
-          />
-        </>
+          <p className="text-zinc-700 text-xs">Max {formatBytes(MAX_UPLOAD_BYTES)}</p>
+        </div>
       )}
-      {error && <span className="text-red-400 text-sm" role="alert">{error}</span>}
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="audio/*"
+        onChange={handlePickerChange}
+        className="hidden"
+        aria-label="Choose audio file"
+      />
+
+      {error && <span className="text-red-400 text-sm mt-4" role="alert">{error}</span>}
     </div>
   );
 }
