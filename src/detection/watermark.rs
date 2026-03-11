@@ -103,6 +103,12 @@ pub struct MethodResult {
 }
 
 /// Known watermark carrier frequencies (Hz).
+///
+/// NOTE: All detection thresholds in this module are heuristic — they have NOT
+/// been calibrated against a labeled test corpus.  Use `polez benchmark --labeled`
+/// with a corpus of known watermarked and clean files to measure per-detector
+/// FPR and tune thresholds empirically.  Each threshold is annotated with its
+/// reliability tier (see `method_reliability`).
 const WATERMARK_FREQS: [f64; 4] = [18000.0, 19000.0, 20000.0, 21000.0];
 
 /// Watermark detector - runs multiple detection methods.
