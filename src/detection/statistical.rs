@@ -85,10 +85,13 @@ pub struct SpectralAnalysis {
     pub suspicious: bool,
 }
 
-// Human audio characteristic ranges
-const ENTROPY_RANGE: (f64, f64) = (6.0, 10.0);
-const KURTOSIS_RANGE: (f64, f64) = (1.5, 6.0);
-const SKEWNESS_RANGE: (f64, f64) = (-0.5, 0.5);
+// Human audio characteristic ranges — calibrated to avoid false positives on
+// common audio types.  Speech entropy is typically 5-7, so the lower bound must
+// sit below that.  Percussion/transient-heavy material often has kurtosis > 10,
+// and brass/voice can reach |skewness| ≈ 1.0.
+const ENTROPY_RANGE: (f64, f64) = (4.0, 11.0);
+const KURTOSIS_RANGE: (f64, f64) = (1.0, 15.0);
+const SKEWNESS_RANGE: (f64, f64) = (-1.5, 1.5);
 
 /// Statistical analyzer for AI-generated audio characteristics.
 pub struct StatisticalAnalyzer;
@@ -315,10 +318,12 @@ fn calculate_ai_probability(features: &HashMap<String, f64>, ai_indicators: &AiI
     }
 
     if let Some(&flatness) = features.get("spectral_flatness") {
-        let flat_score = if flatness < 0.1 {
-            0.7
-        } else if flatness > 0.8 {
-            0.6
+        // Tonal music can have flatness < 0.05; broadband content (drums, noise)
+        // can exceed 0.9.  Only flag extreme outliers.
+        let flat_score = if flatness < 0.02 {
+            0.5
+        } else if flatness > 0.95 {
+            0.4
         } else {
             0.0
         };

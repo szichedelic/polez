@@ -102,7 +102,6 @@ pub struct MethodResult {
     pub reliability: ReliabilityTier,
 }
 
-
 /// Known watermark carrier frequencies (Hz).
 const WATERMARK_FREQS: [f64; 4] = [18000.0, 19000.0, 20000.0, 21000.0];
 
