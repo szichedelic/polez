@@ -59,6 +59,7 @@ export function Spectrogram({ fileLoaded }: Props) {
   const prevViewRef = useRef<ViewRange>(DEFAULT_VIEW);
   const pinchStartDist = useRef<number | null>(null);
   const pinchStartView = useRef<ViewRange | null>(null);
+  const [cursor, setCursor] = useState<{ x: number; y: number; freq: number; time: number; db: number } | null>(null);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -276,19 +277,42 @@ export function Spectrogram({ fileLoaded }: Props) {
   }, [view]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragging || !dragStart.current || !canvasRef.current || !data) return;
+    const canvas = canvasRef.current;
+    if (!canvas || !data) return;
+    const rect = canvas.getBoundingClientRect();
 
-    const rect = canvasRef.current.getBoundingClientRect();
+    // Cursor tooltip
+    const xFrac = (e.clientX - rect.left) / rect.width;
+    const yFrac = 1 - (e.clientY - rect.top) / rect.height;
+    const freqRange = view.freqMax - view.freqMin;
+    const timeRange = view.duration > 0 ? view.duration : (data.time_end - data.time_start);
+    const freq = view.freqMin + freqRange * yFrac;
+    const time = view.timeStart + timeRange * xFrac;
+
+    // Look up dB value
+    const ti = Math.round(xFrac * (data.num_time_frames - 1));
+    const fi = Math.round(yFrac * (data.num_freq_bins - 1));
+    const db = (ti >= 0 && ti < data.num_time_frames && fi >= 0 && fi < data.num_freq_bins)
+      ? data.magnitudes[ti][fi] : 0;
+
+    setCursor({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      freq, time, db,
+    });
+
+    // Drag pan
+    if (!dragging || !dragStart.current) return;
     const dx = (e.clientX - dragStart.current.x) / rect.width;
     const dy = (e.clientY - dragStart.current.y) / rect.height;
 
     const sv = dragStart.current.view;
-    const freqRange = sv.freqMax - sv.freqMin;
-    const timeRange = sv.duration > 0 ? sv.duration : (data.time_end - data.time_start);
+    const svFreqRange = sv.freqMax - sv.freqMin;
+    const svTimeRange = sv.duration > 0 ? sv.duration : (data.time_end - data.time_start);
 
-    const newTimeStart = Math.max(0, sv.timeStart - dx * timeRange);
-    const newFreqMin = Math.max(0, sv.freqMin + dy * freqRange);
-    const newFreqMax = Math.min(24000, newFreqMin + freqRange);
+    const newTimeStart = Math.max(0, sv.timeStart - dx * svTimeRange);
+    const newFreqMin = Math.max(0, sv.freqMin + dy * svFreqRange);
+    const newFreqMax = Math.min(24000, newFreqMin + svFreqRange);
 
     const newView = {
       freqMin: Math.round(newFreqMin),
@@ -298,11 +322,17 @@ export function Spectrogram({ fileLoaded }: Props) {
     };
     applyCssTransform(newView);
     setView(newView);
-  }, [dragging, data, applyCssTransform]);
+  }, [dragging, data, view, applyCssTransform]);
 
   const handleMouseUp = useCallback(() => {
     setDragging(false);
     dragStart.current = null;
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setDragging(false);
+    dragStart.current = null;
+    setCursor(null);
   }, []);
 
   const resetZoom = useCallback(() => {
@@ -320,6 +350,23 @@ export function Spectrogram({ fileLoaded }: Props) {
   // Minimap viewport fraction
   const minimapLeft = fullDuration > 0 ? (view.timeStart / fullDuration) * 100 : 0;
   const minimapWidth = fullDuration > 0 ? (currentTimeRange / fullDuration) * 100 : 100;
+
+  // Frequency axis ticks
+  const freqTicks = [0, 2000, 4000, 8000, 12000, 16000, 20000, 24000]
+    .filter(f => f >= view.freqMin && f <= view.freqMax)
+    .map(f => ({
+      freq: f,
+      label: f >= 1000 ? `${f / 1000}k` : `${f}`,
+      pct: ((view.freqMax - f) / (view.freqMax - view.freqMin)) * 100,
+    }));
+
+  // Time axis ticks
+  const timeTickCount = 6;
+  const timeStep = currentTimeRange / timeTickCount;
+  const timeTicks = Array.from({ length: timeTickCount + 1 }, (_, i) => {
+    const t = view.timeStart + i * timeStep;
+    return { time: t, pct: (i / timeTickCount) * 100 };
+  });
 
   return (
     <Card label="Spectrogram display">
@@ -357,32 +404,79 @@ export function Spectrogram({ fileLoaded }: Props) {
         </div>
       )}
 
-      <div className="flex gap-2">
-        <div
-          ref={containerRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          className="relative overflow-hidden flex-1"
-          style={{ cursor: dragging ? 'grabbing' : 'grab' }}
-        >
-          <canvas
-            ref={canvasRef}
-            className="w-full h-48 rounded"
-            style={{
-              imageRendering: 'pixelated',
-              transform: cssTransform || undefined,
-              transformOrigin: '0 0',
-              transition: cssTransform ? 'none' : undefined,
-            }}
-            aria-label="Spectrogram frequency visualization"
-            role="img"
-          />
+      <div className="flex gap-1">
+        {/* Frequency axis labels */}
+        {data && (
+          <div className="relative h-48 w-8 shrink-0">
+            {freqTicks.map(tick => (
+              <span
+                key={tick.freq}
+                className="absolute right-0.5 text-zinc-500 text-[0.55rem] font-data leading-none -translate-y-1/2"
+                style={{ top: `${tick.pct}%` }}
+              >
+                {tick.label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Main spectrogram area */}
+        <div className="flex-1 flex flex-col">
+          <div
+            ref={containerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+            className="relative overflow-hidden"
+            style={{ cursor: dragging ? 'grabbing' : 'grab' }}
+          >
+            <canvas
+              ref={canvasRef}
+              className="w-full h-48 rounded"
+              style={{
+                imageRendering: 'pixelated',
+                transform: cssTransform || undefined,
+                transformOrigin: '0 0',
+                transition: cssTransform ? 'none' : undefined,
+              }}
+              aria-label="Spectrogram frequency visualization"
+              role="img"
+            />
+            {/* Crosshair + tooltip */}
+            {cursor && !dragging && (
+              <>
+                <div className="absolute top-0 bottom-0 w-px bg-zinc-400/30 pointer-events-none" style={{ left: cursor.x }} />
+                <div className="absolute left-0 right-0 h-px bg-zinc-400/30 pointer-events-none" style={{ top: cursor.y }} />
+                <div
+                  className="absolute bg-zinc-950/85 text-zinc-300 text-[0.6rem] font-data px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap"
+                  style={{ left: cursor.x + 8, top: cursor.y - 28 }}
+                >
+                  {cursor.time.toFixed(2)}s · {(cursor.freq / 1000).toFixed(1)}kHz · {cursor.db.toFixed(1)}dB
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Time axis labels */}
+          {data && (
+            <div className="relative h-4 mt-0.5">
+              {timeTicks.map((tick, i) => (
+                <span
+                  key={i}
+                  className="absolute text-zinc-500 text-[0.55rem] font-data leading-none -translate-x-1/2"
+                  style={{ left: `${tick.pct}%` }}
+                >
+                  {tick.time.toFixed(1)}s
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+
         {/* dB colorbar */}
         {data && (
-          <div className="flex flex-col items-center justify-between h-48 shrink-0">
+          <div className="flex flex-col items-center justify-between h-48 shrink-0 ml-1">
             <span className="text-zinc-500 text-[0.6rem] font-data">{dbRange[1].toFixed(0)}</span>
             <div
               className="w-3 flex-1 my-0.5 rounded-sm"
@@ -395,13 +489,6 @@ export function Spectrogram({ fileLoaded }: Props) {
           </div>
         )}
       </div>
-      {data && (
-        <div className="flex justify-between text-zinc-500 text-xs mt-1 font-data">
-          <span>{data.time_start.toFixed(1)}s</span>
-          <span>{(data.freq_min / 1000).toFixed(1)}kHz – {(data.freq_max / 1000).toFixed(1)}kHz</span>
-          <span>{data.time_end.toFixed(1)}s</span>
-        </div>
-      )}
     </Card>
   );
 }
