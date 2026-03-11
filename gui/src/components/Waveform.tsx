@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { getAudioUrl } from '../api/client';
 import { Card } from './Card';
+import { Button } from './Button';
 
 interface Props {
   fileLoaded: boolean;
@@ -43,20 +44,12 @@ export function Waveform({ fileLoaded }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">WAVEFORM</span>
         <div className="flex gap-2">
-          <button
-            onClick={() => wsRef.current?.playPause()}
-            className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
-            aria-label="Play or pause waveform"
-          >
+          <Button onClick={() => wsRef.current?.playPause()} aria-label="Play or pause waveform">
             Play/Pause
-          </button>
-          <button
-            onClick={() => wsRef.current?.stop()}
-            className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
-            aria-label="Stop waveform playback"
-          >
+          </Button>
+          <Button onClick={() => wsRef.current?.stop()} aria-label="Stop waveform playback">
             Stop
-          </button>
+          </Button>
         </div>
       </div>
       <div ref={containerRef} aria-label="Audio waveform visualization" role="img" />

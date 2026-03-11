@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { analyzeAll, analyzeWatermark, analyzePolez, analyzeStatistical, analyzeMetadata } from '../api/client';
 import { useColorblind } from '../hooks/useColorblind';
 import { Card } from './Card';
+import { Button } from './Button';
 
 interface Props {
   fileLoaded: boolean;
@@ -56,15 +57,15 @@ export function DetectionPanel({ fileLoaded }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="font-heading text-zinc-600 text-[0.65rem] font-medium uppercase tracking-[0.18em]">DETECTION</span>
         <div className="flex gap-2">
-          <button
+          <Button
+            variant="primary"
             data-action="detect"
             onClick={() => runAnalysis('all')}
             disabled={!fileLoaded || !!loading}
-            className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
             aria-label="Run all detection analyses"
           >
             {loading === 'all' ? 'Running...' : 'Run All'}
-          </button>
+          </Button>
           <select
             onChange={(e) => { if (e.target.value) runAnalysis(e.target.value); e.target.value = ''; }}
             disabled={!fileLoaded || !!loading}

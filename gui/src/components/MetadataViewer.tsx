@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { analyzeMetadata } from '../api/client';
 import { Card } from './Card';
+import { Button } from './Button';
 
 interface TagInfo {
   tag_type: string;
@@ -69,14 +70,9 @@ export function MetadataViewer({ fileLoaded, hasCleaned }: Props) {
               Show removed
             </label>
           )}
-          <button
-            onClick={scan}
-            disabled={loading}
-            className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-3 py-2 sm:py-1 rounded text-xs min-h-[44px] sm:min-h-0"
-            aria-label="Scan file for metadata tags"
-          >
+          <Button onClick={scan} disabled={loading} aria-label="Scan file for metadata tags">
             {loading ? 'Scanning...' : 'Scan Tags'}
-          </button>
+          </Button>
         </div>
       </div>
 

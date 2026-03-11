@@ -35,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
             <button
               onClick={() => this.setState({ hasError: false, error: null })}
-              className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-1 rounded text-xs"
+              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-[6px] px-[0.9rem] py-[0.45rem] text-[0.7rem] font-medium"
             >
               Retry
             </button>

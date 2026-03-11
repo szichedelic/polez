@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { batchClean, getBatchDownloadUrl, MAX_UPLOAD_BYTES } from '../api/client';
 import type { BatchFileResult } from '../api/client';
 import { Card } from './Card';
+import { Button } from './Button';
 
 interface BatchFile {
   file: File;
@@ -108,21 +109,18 @@ export function BatchPanel() {
             <option value="preserving">Preserving</option>
             <option value="aggressive">Aggressive</option>
           </select>
-          <button
+          <Button
+            variant="primary"
             onClick={handleProcess}
             disabled={processing || files.length === 0}
-            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
             aria-label={`Clean ${files.length} file${files.length !== 1 ? 's' : ''}`}
           >
             {processing ? 'Processing...' : `Clean ${files.length} file${files.length !== 1 ? 's' : ''}`}
-          </button>
+          </Button>
           {files.length > 0 && !processing && (
-            <button
-              onClick={clearAll}
-              className="text-zinc-500 hover:text-zinc-300 text-xs min-h-[44px] sm:min-h-0"
-            >
+            <Button variant="ghost" onClick={clearAll}>
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </div>

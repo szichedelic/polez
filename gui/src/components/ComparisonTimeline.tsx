@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { getAudioUrl, getCleanedAudioUrl } from '../api/client';
 import { Card } from './Card';
+import { Button } from './Button';
 
 interface Props {
   fileLoaded: boolean;
@@ -185,20 +186,18 @@ export function ComparisonTimeline({ fileLoaded, hasCleaned }: Props) {
           <div className="hidden sm:block w-px h-4 bg-zinc-800" />
 
           <div className="flex gap-2">
-            <button
+            <Button
               onClick={togglePlayPause}
-              className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
               aria-label={playing ? 'Pause comparison playback' : 'Play comparison'}
             >
               {playing ? 'Pause' : 'Play'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={stop}
-              className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2 sm:py-1 rounded text-sm min-h-[44px] sm:min-h-0"
               aria-label="Stop comparison playback"
             >
               Stop
-            </button>
+            </Button>
           </div>
         </div>
       </div>

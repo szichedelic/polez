@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import type { FileInfo } from '../api/client';
 import { uploadFile, MAX_UPLOAD_BYTES } from '../api/client';
+import { Button } from './Button';
 
 interface Props {
   fileInfo: FileInfo | null;
@@ -131,13 +132,9 @@ export function FileHeader({ fileInfo, onFileLoaded }: Props) {
             Drag & drop an audio file here
           </div>
           <div className="text-zinc-500 text-xs">or</div>
-          <button
-            onClick={() => inputRef.current?.click()}
-            className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-4 py-2.5 sm:py-1.5 rounded text-sm font-medium min-h-[44px]"
-            aria-label="Choose audio file to upload"
-          >
+          <Button variant="primary" onClick={() => inputRef.current?.click()} aria-label="Choose audio file to upload">
             Choose File
-          </button>
+          </Button>
           <div className="text-zinc-600 text-xs mt-1">
             Max {formatBytes(MAX_UPLOAD_BYTES)}
           </div>

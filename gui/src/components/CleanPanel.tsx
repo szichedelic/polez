@@ -3,6 +3,7 @@ import { cleanFile, saveCleanedFile, getPresets, DEFAULT_ADVANCED_FLAGS, DEFAULT
 import type { CleanResponse, VerificationResult as VerResult, PresetInfo, AdvancedFlags, FingerprintFlags } from '../api/client';
 import { useColorblind } from '../hooks/useColorblind';
 import { Card } from './Card';
+import { Button } from './Button';
 
 interface Props {
   fileLoaded: boolean;
@@ -216,25 +217,25 @@ export function CleanPanel({ fileLoaded, onCleaned }: Props) {
             <option value="preserving">Preserving</option>
             <option value="aggressive">Aggressive</option>
           </select>
-          <button
+          <Button
+            variant="primary"
             data-action="clean"
             onClick={handleClean}
             disabled={!fileLoaded || loading}
-            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
             aria-label="Start audio sanitization"
           >
             {loading ? 'Cleaning...' : 'Clean'}
-          </button>
+          </Button>
           {result && (
-            <button
+            <Button
+              variant="secondary"
               data-action="save"
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[44px] sm:min-h-0"
               aria-label="Save cleaned audio file"
             >
               {saving ? 'Saving...' : 'Save File'}
-            </button>
+            </Button>
           )}
         </div>
       </div>
