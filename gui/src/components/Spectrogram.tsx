@@ -61,7 +61,6 @@ function extractAnnotations(results: DetectionResults | null | undefined): Annot
   if (!results) return [];
   const annotations: Annotation[] = [];
 
-  // Parse watermark results for frequency info
   const wm = results.watermark;
   if (wm?.method_results) {
     // frequency_domain detections — look for "Suspicious energy at XXXXX Hz"
@@ -82,7 +81,6 @@ function extractAnnotations(results: DetectionResults | null | undefined): Annot
       }
     }
 
-    // Spread spectrum — full-band indicator
     const ss = wm.method_results.spread_spectrum;
     if (ss?.detected) {
       annotations.push({
@@ -223,7 +221,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
     setCssTransform(`translate(${translateX}%, ${translateY}%) scale(${scaleX}, ${scaleY})`);
   }, []);
 
-  // Wheel zoom
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -262,6 +259,7 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
           timeStart: Math.round(newTimeStart * 100) / 100,
           duration: Math.round(newTimeRange * 100) / 100,
         };
+        if (Object.values(newView).some(v => !Number.isFinite(v))) return prev;
         applyCssTransform(newView);
         return newView;
       });
@@ -271,7 +269,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
     return () => container.removeEventListener('wheel', onWheel);
   }, [applyCssTransform]);
 
-  // Touch pinch-to-zoom
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -317,8 +314,10 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
           timeStart: Math.round(newTimeStart * 100) / 100,
           duration: Math.round(newTimeRange * 100) / 100,
         };
-        applyCssTransform(newView);
-        setView(newView);
+        if (!Object.values(newView).some(v => !Number.isFinite(v))) {
+          applyCssTransform(newView);
+          setView(newView);
+        }
       }
     };
 
@@ -348,7 +347,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
     if (!canvas || !data) return;
     const rect = canvas.getBoundingClientRect();
 
-    // Cursor tooltip
     const xFrac = (e.clientX - rect.left) / rect.width;
     const yFrac = 1 - (e.clientY - rect.top) / rect.height;
     const freqRange = view.freqMax - view.freqMin;
@@ -356,7 +354,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
     const freq = view.freqMin + freqRange * yFrac;
     const time = view.timeStart + timeRange * xFrac;
 
-    // Look up dB value
     const ti = Math.round(xFrac * (data.num_time_frames - 1));
     const fi = Math.round(yFrac * (data.num_freq_bins - 1));
     const db = (ti >= 0 && ti < data.num_time_frames && fi >= 0 && fi < data.num_freq_bins)
@@ -368,7 +365,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
       freq, time, db,
     });
 
-    // Drag pan
     if (!dragging || !dragStart.current) return;
     const dx = (e.clientX - dragStart.current.x) / rect.width;
     const dy = (e.clientY - dragStart.current.y) / rect.height;
@@ -387,8 +383,10 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
       timeStart: Math.round(newTimeStart * 100) / 100,
       duration: sv.duration,
     };
-    applyCssTransform(newView);
-    setView(newView);
+    if (!Object.values(newView).some(v => !Number.isFinite(v))) {
+      applyCssTransform(newView);
+      setView(newView);
+    }
   }, [dragging, data, view, applyCssTransform]);
 
   const handleMouseUp = useCallback(() => {
@@ -409,19 +407,16 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
 
   const isZoomed = view.freqMin !== 0 || view.freqMax !== 24000 || view.timeStart !== 0 || view.duration !== 0;
 
-  // Compute zoom level and viewport info
-  const currentTimeRange = view.duration > 0 ? view.duration : fullDuration;
-  const zoomPercent = fullDuration > 0 ? Math.round((fullDuration / currentTimeRange) * 100) : 100;
-  const viewTimeEnd = view.timeStart + currentTimeRange;
+  // Compute zoom level and viewport info — guard NaN propagation
+  const currentTimeRange = view.duration > 0 && Number.isFinite(view.duration) ? view.duration : fullDuration;
+  const zoomPercent = fullDuration > 0 && currentTimeRange > 0 ? Math.round((fullDuration / currentTimeRange) * 100) : 100;
+  const viewTimeEnd = (Number.isFinite(view.timeStart) ? view.timeStart : 0) + (Number.isFinite(currentTimeRange) ? currentTimeRange : 0);
 
-  // Minimap viewport fraction
   const minimapLeft = fullDuration > 0 ? (view.timeStart / fullDuration) * 100 : 0;
   const minimapWidth = fullDuration > 0 ? (currentTimeRange / fullDuration) * 100 : 100;
 
-  // Detection annotations
   const annotations = extractAnnotations(detectionResults);
 
-  // Frequency axis ticks
   const freqTicks = [0, 2000, 4000, 8000, 12000, 16000, 20000, 24000]
     .filter(f => f >= view.freqMin && f <= view.freqMax)
     .map(f => ({
@@ -430,11 +425,13 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
       pct: ((view.freqMax - f) / (view.freqMax - view.freqMin)) * 100,
     }));
 
-  // Time axis ticks
+  // Time axis ticks — guard against NaN when duration is unknown
   const timeTickCount = 6;
-  const timeStep = currentTimeRange / timeTickCount;
+  const safeTimeRange = Number.isFinite(currentTimeRange) && currentTimeRange > 0 ? currentTimeRange : 0;
+  const safeTimeStart = Number.isFinite(view.timeStart) ? view.timeStart : 0;
+  const timeStep = safeTimeRange / timeTickCount;
   const timeTicks = Array.from({ length: timeTickCount + 1 }, (_, i) => {
-    const t = view.timeStart + i * timeStep;
+    const t = safeTimeStart + i * timeStep;
     return { time: t, pct: (i / timeTickCount) * 100 };
   });
 
@@ -464,7 +461,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
         </div>
       </div>
 
-      {/* Minimap overview */}
       {isZoomed && fullDuration > 0 && (
         <div className="relative h-1.5 bg-zinc-900 rounded-full mb-2 overflow-hidden">
           <div
@@ -475,7 +471,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
       )}
 
       <div className="flex gap-1">
-        {/* Frequency axis labels */}
         {data && (
           <div className="relative h-48 w-8 shrink-0">
             {freqTicks.map(tick => (
@@ -490,7 +485,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
           </div>
         )}
 
-        {/* Main spectrogram area */}
         <div className="flex-1 flex flex-col">
           <div
             ref={containerRef}
@@ -513,7 +507,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
               aria-label="Spectrogram frequency visualization"
               role="img"
             />
-            {/* Detection annotations */}
             {annotations.map((ann, i) => {
               if (ann.type === 'freq-band' && ann.freqMin != null && ann.freqMax != null) {
                 const freqRange = view.freqMax - view.freqMin;
@@ -540,7 +533,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
               }
               return null;
             })}
-            {/* Crosshair + tooltip */}
             {cursor && !dragging && (
               <>
                 <div className="absolute top-0 bottom-0 w-px bg-zinc-400/30 pointer-events-none" style={{ left: cursor.x }} />
@@ -555,7 +547,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
             )}
           </div>
 
-          {/* Time axis labels */}
           {data && (
             <div className="relative h-4 mt-0.5">
               {timeTicks.map((tick, i) => (
@@ -571,7 +562,6 @@ export function Spectrogram({ fileLoaded, detectionResults }: Props) {
           )}
         </div>
 
-        {/* dB colorbar */}
         {data && (
           <div className="flex flex-col items-center justify-between h-48 shrink-0 ml-1">
             <span className="text-zinc-500 text-[0.6rem] font-data">{dbRange[1].toFixed(0)}</span>
