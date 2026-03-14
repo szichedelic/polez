@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polez Brand System — Final Direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #09090b; color: #e4e4e7; padding: 2.5rem; max-width: 960px; margin: 0 auto; }
+
+  /* Typography system */
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; color: #fafafa; margin-bottom: 0.25rem; }
+  .subtitle { font-size: 0.75rem; color: #52525b; margin-bottom: 3rem; font-family: 'Inter'; }
+  h2 { font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.2em; color: #52525b; margin: 3rem 0 1rem; font-weight: 500; }
+  h3 { font-family: 'Inter'; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.12em; color: #3f3f46; margin: 1.5rem 0 0.75rem; font-weight: 500; }
+  hr { border: none; border-top: 1px solid #18181b; margin: 3rem 0; }
+  p.note { font-size: 0.7rem; color: #3f3f46; margin-bottom: 1.25rem; line-height: 1.6; }
+
+  /* Swatches */
+  .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+  .swatch {
+    width: 100px; height: 64px; border-radius: 6px; display: flex; flex-direction: column;
+    justify-content: flex-end; padding: 5px 7px; font-family: 'JetBrains Mono', monospace;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .swatch .name { font-weight: 500; font-size: 0.6rem; }
+  .swatch .hex { opacity: 0.5; font-size: 0.55rem; }
+  .lt { color: #fafafa; }
+  .dk { color: #18181b; }
+
+  /* Cards */
+  .card {
+    background: #18181b; border: 1px solid #27272a; border-radius: 6px; padding: 1.25rem;
+  }
+  .card-active {
+    background: #18181b; border: 1px solid #27272a; border-left: 2px solid #52525b; border-radius: 0 6px 6px 0;
+    padding: 1.25rem;
+  }
+
+  /* Tokens */
+  .token-grid { display: grid; grid-template-columns: 140px 1fr; gap: 0.25rem 1rem; font-size: 0.7rem; margin-bottom: 1rem; }
+  .token-key { color: #52525b; font-family: 'JetBrains Mono'; font-size: 0.625rem; padding: 0.25rem 0; }
+  .token-val { color: #a1a1aa; font-size: 0.7rem; padding: 0.25rem 0; }
+
+  /* Buttons */
+  .button-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
+  .btn {
+    padding: 0.45rem 0.9rem; border-radius: 6px; font-size: 0.7rem; font-weight: 500;
+    border: none; cursor: pointer; font-family: 'Inter';
+  }
+
+  /* Mock panels */
+  .mock-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .mock-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+  .mock-label { font-family: 'Space Grotesk'; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.18em; color: #52525b; font-weight: 500; }
+  .mock-badge { font-size: 0.575rem; padding: 2px 7px; border-radius: 4px; font-weight: 500; font-family: 'JetBrains Mono'; }
+  .mock-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0; }
+  .mock-row .name { flex: 1; font-size: 0.75rem; font-family: 'Inter'; }
+  .mock-bar-bg { width: 80px; height: 4px; border-radius: 2px; background: #27272a; overflow: hidden; }
+  .mock-bar-fill { height: 100%; border-radius: 2px; }
+  .mock-pct { font-size: 0.625rem; font-family: 'JetBrains Mono'; width: 2rem; text-align: right; color: #71717a; }
+  .mock-divider { height: 1px; background: #27272a; margin: 0.4rem 0; }
+
+  /* Font specimen */
+  .specimen { margin-bottom: 1.5rem; }
+  .specimen-label { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.15em; color: #3f3f46; margin-bottom: 0.5rem; font-family: 'JetBrains Mono'; }
+  .specimen-sample { margin-bottom: 0.25rem; }
+</style>
+</head>
+<body>
+
+<h1>POLEZ</h1>
+<div class="subtitle">Brand system — final direction. Neutral palette, data-first, precision aesthetic.</div>
+
+<!-- ═══════════════ DESIGN TOKENS ═══════════════ -->
+<h2>Design Tokens</h2>
+<p class="note">The complete token set. No accent colors — color is reserved for data only.</p>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem;">
+  <div>
+    <h3>Palette (Zinc)</h3>
+    <div class="token-grid">
+      <span class="token-key">--bg-page</span><span class="token-val">zinc-950 #09090b</span>
+      <span class="token-key">--bg-card</span><span class="token-val">zinc-900 #18181b</span>
+      <span class="token-key">--border</span><span class="token-val">zinc-800 #27272a</span>
+      <span class="token-key">--border-active</span><span class="token-val">zinc-700 #3f3f46</span>
+      <span class="token-key">--text-muted</span><span class="token-val">zinc-600 #52525b</span>
+      <span class="token-key">--text-secondary</span><span class="token-val">zinc-400 #a1a1aa</span>
+      <span class="token-key">--text-primary</span><span class="token-val">zinc-200 #e4e4e7</span>
+      <span class="token-key">--text-emphasis</span><span class="token-val">zinc-50 #fafafa</span>
+    </div>
+  </div>
+  <div>
+    <h3>Surfaces</h3>
+    <div class="token-grid">
+      <span class="token-key">--radius</span><span class="token-val">6px</span>
+      <span class="token-key">--border-width</span><span class="token-val">1px</span>
+      <span class="token-key">--active-accent</span><span class="token-val">2px left border, zinc-700</span>
+      <span class="token-key">--shadow</span><span class="token-val">none</span>
+    </div>
+    <h3 style="margin-top:1rem;">Data Colors (10%)</h3>
+    <div class="token-grid">
+      <span class="token-key">--data-threat</span><span class="token-val">rose-500 #f43f5e</span>
+      <span class="token-key">--data-warning</span><span class="token-val">amber-500 #f59e0b</span>
+      <span class="token-key">--data-clean</span><span class="token-val">emerald-500 #10b981</span>
+      <span class="token-key">--data-waveform</span><span class="token-val">zinc-400 #a1a1aa</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PALETTE ═══════════════ -->
+<h2>Palette</h2>
+<div class="row">
+  <div class="swatch lt" style="background:#09090b"><span class="name">950</span><span class="hex">#09090b</span></div>
+  <div class="swatch lt" style="background:#18181b"><span class="name">900</span><span class="hex">#18181b</span></div>
+  <div class="swatch lt" style="background:#27272a"><span class="name">800</span><span class="hex">#27272a</span></div>
+  <div class="swatch lt" style="background:#3f3f46"><span class="name">700</span><span class="hex">#3f3f46</span></div>
+  <div class="swatch lt" style="background:#52525b"><span class="name">600</span><span class="hex">#52525b</span></div>
+  <div class="swatch dk" style="background:#a1a1aa"><span class="name">400</span><span class="hex">#a1a1aa</span></div>
+  <div class="swatch dk" style="background:#e4e4e7"><span class="name">200</span><span class="hex">#e4e4e7</span></div>
+  <div class="swatch dk" style="background:#fafafa"><span class="name">50</span><span class="hex">#fafafa</span></div>
+</div>
+<h3>Data-only colors</h3>
+<div class="row">
+  <div class="swatch lt" style="background:#f43f5e"><span class="name">Threat</span><span class="hex">rose-500</span></div>
+  <div class="swatch dk" style="background:#f59e0b"><span class="name">Warning</span><span class="hex">amber-500</span></div>
+  <div class="swatch lt" style="background:#10b981"><span class="name">Clean</span><span class="hex">emerald-500</span></div>
+</div>
+
+<hr>
+
+<!-- ═══════════════ TYPOGRAPHY ═══════════════ -->
+<h2>Typography</h2>
+
+<div class="specimen">
+  <div class="specimen-label">Headings — Space Grotesk 500-600</div>
+  <div class="specimen-sample" style="font-family:'Space Grotesk'; font-weight:600; font-size:1.25rem; color:#fafafa;">Detection Results</div>
+  <div class="specimen-sample" style="font-family:'Space Grotesk'; font-weight:500; font-size:0.875rem; color:#a1a1aa;">Spread spectrum watermark detected</div>
+  <div class="specimen-sample" style="font-family:'Space Grotesk'; font-weight:500; font-size:0.65rem; color:#52525b; text-transform:uppercase; letter-spacing:0.18em;">SECTION LABEL</div>
+</div>
+
+<div class="specimen">
+  <div class="specimen-label">Body — Inter 400-500</div>
+  <div class="specimen-sample" style="font-family:'Inter'; font-weight:400; font-size:0.8rem; color:#e4e4e7; line-height:1.6;">High-confidence spread spectrum watermark detected in the 18-22kHz ultrasonic range. Recommend aggressive sanitization mode for full removal.</div>
+  <div class="specimen-sample" style="font-family:'Inter'; font-weight:500; font-size:0.7rem; color:#a1a1aa; margin-top:0.25rem;">Button label &nbsp;&middot;&nbsp; Menu item &nbsp;&middot;&nbsp; Field label</div>
+</div>
+
+<div class="specimen">
+  <div class="specimen-label">Data — JetBrains Mono 400</div>
+  <div class="specimen-sample" style="font-family:'JetBrains Mono'; font-weight:400; font-size:0.8rem; color:#e4e4e7;">82.4% &nbsp; 21.5kHz &nbsp; 00:03.241 &nbsp; 44100Hz &nbsp; 16bit</div>
+  <div class="specimen-sample" style="font-family:'JetBrains Mono'; font-weight:400; font-size:0.65rem; color:#52525b;">spread_spectrum &nbsp; echo_watermark &nbsp; lsb_stego</div>
+</div>
+
+<hr>
+
+<!-- ═══════════════ SURFACES ═══════════════ -->
+<h2>Surface Treatments</h2>
+
+<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+  <div>
+    <h3>Default card</h3>
+    <div class="card" style="min-height:100px;">
+      <div style="font-size:0.6rem; color:#3f3f46; font-family:'JetBrains Mono'; line-height:1.8;">
+        bg: zinc-900<br>border: 1px zinc-800<br>radius: 6px<br>shadow: none
+      </div>
+    </div>
+  </div>
+  <div>
+    <h3>Active / selected</h3>
+    <div class="card-active" style="min-height:100px;">
+      <div style="font-size:0.6rem; color:#3f3f46; font-family:'JetBrains Mono'; line-height:1.8;">
+        bg: zinc-900<br>border-left: 2px zinc-700<br>radius: 0 6px 6px 0<br>shadow: none
+      </div>
+    </div>
+  </div>
+  <div>
+    <h3>Recessed / empty</h3>
+    <div style="background:#09090b; border:1px dashed #27272a; border-radius:6px; padding:1.25rem; min-height:100px;">
+      <div style="font-size:0.6rem; color:#3f3f46; font-family:'JetBrains Mono'; line-height:1.8;">
+        bg: zinc-950<br>border: 1px dashed zinc-800<br>radius: 6px<br>for: empty states, drop zones
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════ BUTTONS ═══════════════ -->
+<h2>Buttons</h2>
+
+<div class="button-row">
+  <span style="font-size:0.575rem; color:#3f3f46; font-family:'JetBrains Mono'; min-width:70px;">Primary</span>
+  <button class="btn" style="background:#fafafa; color:#09090b; font-weight:500;">Run Detection</button>
+  <button class="btn" style="background:#fafafa; color:#09090b; font-weight:500;">Clean Audio</button>
+</div>
+<div class="button-row">
+  <span style="font-size:0.575rem; color:#3f3f46; font-family:'JetBrains Mono'; min-width:70px;">Secondary</span>
+  <button class="btn" style="background:#27272a; color:#e4e4e7;">Export</button>
+  <button class="btn" style="background:#27272a; color:#e4e4e7;">Settings</button>
+</div>
+<div class="button-row">
+  <span style="font-size:0.575rem; color:#3f3f46; font-family:'JetBrains Mono'; min-width:70px;">Ghost</span>
+  <button class="btn" style="background:transparent; color:#71717a; border:1px solid #27272a;">Cancel</button>
+  <button class="btn" style="background:transparent; color:#71717a; border:1px solid #27272a;">Reset</button>
+</div>
+<div class="button-row">
+  <span style="font-size:0.575rem; color:#3f3f46; font-family:'JetBrains Mono'; min-width:70px;">Disabled</span>
+  <button class="btn" style="background:#18181b; color:#3f3f46; cursor:not-allowed;">Run Detection</button>
+</div>
+
+<hr>
+
+<!-- ═══════════════ MOCK: FULL PANEL ═══════════════ -->
+<h2>Cohesive Mockups</h2>
+<p class="note">The full system in action. Chrome is invisible. Data is the only color.</p>
+
+<div class="mock-grid" style="margin-bottom:1.5rem;">
+
+  <!-- Detection Panel -->
+  <div class="card">
+    <div class="mock-header">
+      <span class="mock-label">Detection</span>
+      <span class="mock-badge" style="background:rgba(244,63,94,0.1); color:#f43f5e;">3 found</span>
+    </div>
+    <div class="mock-divider"></div>
+    <div class="mock-row">
+      <span class="name" style="color:#e4e4e7">Spread Spectrum</span>
+      <div class="mock-bar-bg"><div class="mock-bar-fill" style="width:82%; background:#f43f5e"></div></div>
+      <span class="mock-pct">82%</span>
+    </div>
+    <div class="mock-row">
+      <span class="name" style="color:#e4e4e7">Echo Watermark</span>
+      <div class="mock-bar-bg"><div class="mock-bar-fill" style="width:47%; background:#f59e0b"></div></div>
+      <span class="mock-pct">47%</span>
+    </div>
+    <div class="mock-row">
+      <span class="name" style="color:#52525b">LSB Stego</span>
+      <div class="mock-bar-bg"><div class="mock-bar-fill" style="width:3%; background:#3f3f46"></div></div>
+      <span class="mock-pct" style="color:#3f3f46">3%</span>
+    </div>
+    <div class="mock-row">
+      <span class="name" style="color:#52525b">Phase Coherence</span>
+      <div class="mock-bar-bg"><div class="mock-bar-fill" style="width:8%; background:#3f3f46"></div></div>
+      <span class="mock-pct" style="color:#3f3f46">8%</span>
+    </div>
+    <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
+      <button class="btn" style="background:#fafafa; color:#09090b; font-size:0.65rem; padding:0.35rem 0.7rem;">Run All</button>
+      <button class="btn" style="background:#27272a; color:#a1a1aa; font-size:0.65rem; padding:0.35rem 0.7rem;">Export</button>
+    </div>
+  </div>
+
+  <!-- Clean Panel -->
+  <div class="card">
+    <div class="mock-header">
+      <span class="mock-label">Sanitization</span>
+      <span class="mock-badge" style="background:rgba(16,185,129,0.1); color:#10b981;">Ready</span>
+    </div>
+    <div class="mock-divider"></div>
+
+    <div style="font-size:0.6rem; color:#52525b; font-family:'Space Grotesk'; text-transform:uppercase; letter-spacing:0.12em; margin:0.5rem 0 0.4rem;">Mode</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-bottom:0.75rem;">
+      <div style="background:#27272a; border:1px solid #3f3f46; border-radius:6px; padding:0.4rem 0.6rem;">
+        <div style="font-size:0.7rem; color:#fafafa; font-family:'Inter'; font-weight:500;">Standard</div>
+        <div style="font-size:0.55rem; color:#52525b;">Balanced removal</div>
+      </div>
+      <div style="background:#18181b; border:1px solid #27272a; border-radius:6px; padding:0.4rem 0.6rem;">
+        <div style="font-size:0.7rem; color:#71717a; font-family:'Inter';">Aggressive</div>
+        <div style="font-size:0.55rem; color:#3f3f46;">Maximum removal</div>
+      </div>
+    </div>
+
+    <div style="font-size:0.6rem; color:#52525b; font-family:'Space Grotesk'; text-transform:uppercase; letter-spacing:0.12em; margin:0.5rem 0 0.4rem;">Advanced &middot; 3 active</div>
+    <div style="display:flex; flex-wrap:wrap; gap:0.3rem; margin-bottom:0.75rem;">
+      <span style="font-size:0.575rem; padding:2px 6px; border-radius:4px; background:#27272a; color:#a1a1aa; font-family:'JetBrains Mono';">phase_dither</span>
+      <span style="font-size:0.575rem; padding:2px 6px; border-radius:4px; background:#27272a; color:#a1a1aa; font-family:'JetBrains Mono';">comb_mask</span>
+      <span style="font-size:0.575rem; padding:2px 6px; border-radius:4px; background:#27272a; color:#a1a1aa; font-family:'JetBrains Mono';">transient_shift</span>
+    </div>
+
+    <button class="btn" style="background:#fafafa; color:#09090b; font-size:0.65rem; padding:0.4rem 0; width:100%; text-align:center;">Clean Audio</button>
+  </div>
+
+</div>
+
+<!-- Waveform -->
+<div class="card" style="max-width:100%; margin-bottom:1rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+    <span class="mock-label">Waveform</span>
+    <span style="font-size:0.575rem; color:#3f3f46; font-family:'JetBrains Mono';">00:42.3 / 03:21.7</span>
+  </div>
+  <div style="height:80px; background:#09090b; border:1px solid #1a1a1e; border-radius:4px; overflow:hidden; position:relative;">
+    <svg width="100%" height="80" viewBox="0 0 800 80" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="wg" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#a1a1aa" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#a1a1aa" stop-opacity="0.15"/>
+        </linearGradient>
+        <linearGradient id="wg2" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#52525b" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="#52525b" stop-opacity="0.1"/>
+        </linearGradient>
+      </defs>
+      <g fill="url(#wg)">
+        <rect x="0" y="28" width="4" height="24" rx="1"/><rect x="6" y="18" width="4" height="44" rx="1"/>
+        <rect x="12" y="12" width="4" height="56" rx="1"/><rect x="18" y="22" width="4" height="36" rx="1"/>
+        <rect x="24" y="30" width="4" height="20" rx="1"/><rect x="30" y="10" width="4" height="60" rx="1"/>
+        <rect x="36" y="5" width="4" height="70" rx="1"/><rect x="42" y="15" width="4" height="50" rx="1"/>
+        <rect x="48" y="25" width="4" height="30" rx="1"/><rect x="54" y="32" width="4" height="16" rx="1"/>
+        <rect x="60" y="8" width="4" height="64" rx="1"/><rect x="66" y="3" width="4" height="74" rx="1"/>
+        <rect x="72" y="10" width="4" height="60" rx="1"/><rect x="78" y="20" width="4" height="40" rx="1"/>
+        <rect x="84" y="28" width="4" height="24" rx="1"/><rect x="90" y="18" width="4" height="44" rx="1"/>
+        <rect x="96" y="5" width="4" height="70" rx="1"/><rect x="102" y="8" width="4" height="64" rx="1"/>
+        <rect x="108" y="15" width="4" height="50" rx="1"/><rect x="114" y="25" width="4" height="30" rx="1"/>
+        <rect x="120" y="30" width="4" height="20" rx="1"/><rect x="126" y="22" width="4" height="36" rx="1"/>
+        <rect x="132" y="10" width="4" height="60" rx="1"/><rect x="138" y="5" width="4" height="70" rx="1"/>
+        <rect x="144" y="12" width="4" height="56" rx="1"/><rect x="150" y="20" width="4" height="40" rx="1"/>
+        <rect x="156" y="28" width="4" height="24" rx="1"/><rect x="162" y="15" width="4" height="50" rx="1"/>
+        <rect x="168" y="8" width="4" height="64" rx="1"/><rect x="174" y="3" width="4" height="74" rx="1"/>
+        <rect x="180" y="10" width="4" height="60" rx="1"/><rect x="186" y="18" width="4" height="44" rx="1"/>
+        <rect x="192" y="25" width="4" height="30" rx="1"/><rect x="198" y="30" width="4" height="20" rx="1"/>
+        <rect x="204" y="22" width="4" height="36" rx="1"/><rect x="210" y="12" width="4" height="56" rx="1"/>
+        <rect x="216" y="5" width="4" height="70" rx="1"/><rect x="222" y="3" width="4" height="74" rx="1"/>
+        <rect x="228" y="8" width="4" height="64" rx="1"/><rect x="234" y="18" width="4" height="44" rx="1"/>
+        <rect x="240" y="25" width="4" height="30" rx="1"/><rect x="246" y="20" width="4" height="40" rx="1"/>
+        <rect x="252" y="12" width="4" height="56" rx="1"/><rect x="258" y="8" width="4" height="64" rx="1"/>
+        <rect x="264" y="15" width="4" height="50" rx="1"/><rect x="270" y="22" width="4" height="36" rx="1"/>
+      </g>
+      <!-- Played region (dimmer, already passed) -->
+      <rect x="0" y="0" width="180" height="80" fill="#09090b" opacity="0.3"/>
+      <!-- Playhead -->
+      <line x1="180" y1="0" x2="180" y2="80" stroke="#fafafa" stroke-width="1.5" opacity="0.7"/>
+    </svg>
+  </div>
+  <div style="display:flex; gap:0.4rem; margin-top:0.6rem; align-items:center;">
+    <button class="btn" style="background:#27272a; color:#fafafa; width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:6px; font-size:0.75rem;">&#9654;</button>
+    <button class="btn" style="background:transparent; color:#52525b; width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:6px; font-size:0.7rem;">&#9632;</button>
+    <div style="flex:1"></div>
+    <span style="font-size:0.55rem; color:#3f3f46; font-family:'JetBrains Mono';">44.1kHz &middot; 16bit &middot; stereo &middot; WAV</span>
+  </div>
+</div>
+
+<!-- File header -->
+<h2>File Header — Loaded State</h2>
+<div class="card" style="margin-bottom:1rem; display:flex; align-items:center; gap:1rem; padding:0.75rem 1.25rem;">
+  <span style="font-family:'Space Grotesk'; font-weight:600; font-size:0.9rem; color:#fafafa; letter-spacing:-0.01em;">POLEZ</span>
+  <div style="width:1px; height:20px; background:#27272a;"></div>
+  <span style="font-size:0.75rem; color:#e4e4e7; font-family:'Inter'; flex:1;">suspicious_audio.wav</span>
+  <span style="font-size:0.575rem; color:#3f3f46; font-family:'JetBrains Mono';">3:21 &middot; 14.2 MB</span>
+  <button class="btn" style="background:transparent; color:#52525b; font-size:0.65rem; padding:0.3rem 0.6rem; border:1px solid #27272a;">Change</button>
+</div>
+
+<!-- Empty upload state -->
+<h2>File Header — Empty State</h2>
+<div style="background:#09090b; border:1px dashed #27272a; border-radius:6px; padding:2.5rem; text-align:center; margin-bottom:1rem;">
+  <div style="font-family:'Space Grotesk'; font-weight:600; font-size:1.1rem; color:#fafafa; margin-bottom:0.5rem; letter-spacing:-0.01em;">POLEZ</div>
+  <div style="font-size:0.7rem; color:#52525b; margin-bottom:1.25rem; font-family:'Inter';">Audio Forensics & Sanitization</div>
+  <div style="font-size:0.75rem; color:#71717a; margin-bottom:0.75rem; font-family:'Inter';">Drop audio file or click to browse</div>
+  <div style="display:flex; gap:0.4rem; justify-content:center;">
+    <span style="font-size:0.55rem; padding:2px 6px; border-radius:4px; background:#18181b; border:1px solid #27272a; color:#52525b; font-family:'JetBrains Mono';">WAV</span>
+    <span style="font-size:0.55rem; padding:2px 6px; border-radius:4px; background:#18181b; border:1px solid #27272a; color:#52525b; font-family:'JetBrains Mono';">MP3</span>
+    <span style="font-size:0.55rem; padding:2px 6px; border-radius:4px; background:#18181b; border:1px solid #27272a; color:#52525b; font-family:'JetBrains Mono';">FLAC</span>
+    <span style="font-size:0.55rem; padding:2px 6px; border-radius:4px; background:#18181b; border:1px solid #27272a; color:#52525b; font-family:'JetBrains Mono';">OGG</span>
+  </div>
+</div>
+
+<hr>
+
+<h2>Summary</h2>
+<div class="token-grid" style="max-width:400px;">
+  <span class="token-key">Palette</span><span class="token-val">Zinc (pure neutral)</span>
+  <span class="token-key">UI font</span><span class="token-val">Space Grotesk (labels/headings)</span>
+  <span class="token-key">Body font</span><span class="token-val">Inter (descriptions)</span>
+  <span class="token-key">Data font</span><span class="token-val">JetBrains Mono (values)</span>
+  <span class="token-key">Radius</span><span class="token-val">6px</span>
+  <span class="token-key">Border</span><span class="token-val">1px solid zinc-800</span>
+  <span class="token-key">Active state</span><span class="token-val">2px left border zinc-700</span>
+  <span class="token-key">Shadow</span><span class="token-val">None</span>
+  <span class="token-key">Primary button</span><span class="token-val">zinc-50 bg / zinc-950 text</span>
+  <span class="token-key">Color usage</span><span class="token-val">Data only (rose/amber/emerald)</span>
+</div>
+
+</body>
+</html>
